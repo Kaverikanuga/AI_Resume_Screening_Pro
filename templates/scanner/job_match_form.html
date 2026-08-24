@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Job Match Analysis - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+      <div class="glass-card glass-card-glow p-4 p-sm-5 mb-4">
+        <div class="text-center mb-4">
+          <div class="badge badge-info mb-2 py-1 px-3">TF-IDF & SKILL GAP MATCHER</div>
+          <h2 class="fw-bold">Compare Resume to Job Description</h2>
+          <p class="text-muted small">Enter the job details below to calculate skill match %, keyword overlap, and job readiness.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('scanner.job_match') }}">
+          {{ form.hidden_tag() }}
+
+          <!-- Resume Selector -->
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Select Resume for Comparison</label>
+            <select name="resume_id" class="form-select">
+              {% for r in resumes %}
+                <option value="{{ r.id }}" {{ 'selected' if selected_resume and selected_resume.id == r.id }}>
+                  {{ r.original_filename }} (ATS Score: {{ r.ats_score or 0 }}/100)
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6 mb-3 mb-md-0">
+              <label class="form-label text-muted small fw-semibold">Job Title *</label>
+              {{ form.job_title(class="form-control", placeholder="e.g. Senior Software Engineer") }}
+              {% if form.job_title.errors %}
+                <div class="text-danger small mt-1">{{ form.job_title.errors[0] }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted small fw-semibold">Company Name (Optional)</label>
+              {{ form.company(class="form-control", placeholder="e.g. Google / Microsoft") }}
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label text-muted small fw-semibold">Job Description (JD Text) *</label>
+            {{ form.job_description(class="form-control", rows=8, placeholder="Paste the full job description requirements, qualifications, and responsibilities here...") }}
+            {% if form.job_description.errors %}
+              <div class="text-danger small mt-1">{{ form.job_description.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="btn btn-gradient btn-lg w-100 py-3 fw-bold">
+            <i class="bi bi-crosshair me-2"></i> Calculate Match & Analyze Skill Gap
+          </button>
+        </form>
+      </div>
+
+      <!-- Recent Matches List -->
+      {% if recent_matches %}
+        <div class="glass-card p-4">
+          <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-info me-2"></i> Recent Job Match Scans</h5>
+          <div class="table-responsive">
+            <table class="table table-custom">
+              <thead>
+                <tr>
+                  <th>Job Title</th>
+                  <th>Company</th>
+                  <th>Match %</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in recent_matches %}
+                  <tr>
+                    <td><strong>{{ m.job_title }}</strong></td>
+                    <td>{{ m.company or 'N/A' }}</td>
+                    <td>
+                      <span class="fw-bold text-{{ 'success' if m.match_percentage >= 70 else ('warning' if m.match_percentage >= 50 else 'danger') }}">
+                        {{ m.match_percentage }}%
+                      </span>
+                    </td>
+                    <td>
+                      {% if m.decision == 'RECOMMENDED' %}
+                        <span class="badge badge-success">✓ RECOMMENDED</span>
+                      {% elif m.decision == 'CONDITIONALLY_RECOMMENDED' %}
+                        <span class="badge badge-warning">⚠ CONDITIONALLY RECOMMENDED</span>
+                      {% else %}
+                        <span class="badge badge-danger">❌ NOT RECOMMENDED</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{{ url_for('scanner.job_match_result', job_match_id=m.id) }}" class="btn btn-sm btn-outline-glass me-1">View Result</a>
+                      {% if m.decision != 'RECOMMENDED' %}
+                        <a href="{{ url_for('scanner.rejection_analysis', job_match_id=m.id) }}" class="btn btn-sm btn-gradient py-1 px-2" style="font-size:0.75rem;">
+                          Rejection Reasons
+                        </a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

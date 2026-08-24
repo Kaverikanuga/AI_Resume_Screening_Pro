@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="glass-card glass-card-glow p-4 p-sm-5">
+        <div class="text-center mb-4">
+          <div class="badge badge-info mb-2 py-1 px-3">WELCOME BACK</div>
+          <h2 class="fw-bold">Sign In to Your Account</h2>
+          <p class="text-muted small">Access your resume analytics, job matches, and career tools.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}">
+          {{ form.hidden_tag() }}
+          
+          <div class="mb-3">
+            <label for="email" class="form-label text-muted small fw-semibold">Email Address</label>
+            {{ form.email(class="form-control", placeholder="name@example.com") }}
+            {% if form.email.errors %}
+              <div class="text-danger small mt-1">{{ form.email.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label for="password" class="form-label text-muted small fw-semibold mb-0">Password</label>
+              <a href="{{ url_for('auth.forgot_password') }}" class="small text-primary text-decoration-none">Forgot password?</a>
+            </div>
+            {{ form.password(class="form-control", placeholder="••••••••") }}
+            {% if form.password.errors %}
+              <div class="text-danger small mt-1">{{ form.password.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-4 form-check">
+            {{ form.remember(class="form-check-input") }}
+            <label class="form-check-label text-muted small" for="remember">Remember me for 14 days</label>
+          </div>
+
+          <button type="submit" class="btn btn-gradient w-100 py-3 fw-bold fs-6">
+            Sign In <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </form>
+
+        <div class="text-center mt-4 pt-3 border-top border-secondary border-opacity-25">
+          <p class="text-muted small mb-0">
+            Don't have an account? <a href="{{ url_for('auth.register') }}" class="fw-bold text-primary">Register Free</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Failed - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+  <div class="glass-card glass-card-glow p-5 mx-auto" style="max-width: 520px;">
+    <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 80px; height: 80px;">
+      <i class="bi bi-x-lg display-4"></i>
+    </div>
+    
+    <h2 class="fw-bold mb-2">Payment Could Not Be Completed</h2>
+    <p class="text-muted mb-4">Your payment was cancelled or failed verification. Your card/account was not charged.</p>
+    
+    <div class="d-flex gap-3 justify-content-center">
+      <a href="{{ url_for('main.pricing') }}" class="btn btn-gradient px-4 py-3 fw-bold">
+        Try Again <i class="bi bi-arrow-counterclockwise ms-1"></i>
+      </a>
+      <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-glass px-4 py-3">
+        Back to Dashboard
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Preview - {{ doc.title }} - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4 no-print">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <div class="badge badge-info mb-1 py-1 px-3">RESUME PREVIEW</div>
+            <h2 class="fw-bold mb-0">{{ doc.title }}</h2>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-gradient">
+                <i class="bi bi-printer me-1"></i> Print / Save as PDF
+            </button>
+            <a href="{{ url_for('editor.export_pdf', doc_id=doc.id) }}" class="btn btn-outline-glass">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
+            </a>
+            <a href="{{ url_for('editor.edit', doc_id=doc.id) }}" class="btn btn-outline-glass">
+                <i class="bi bi-pencil me-1"></i> Edit
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- White paper-style preview card -->
+    <div class="resume-paper template-preview-{{ doc.template }} mx-auto bg-white text-dark rounded-3 shadow-lg p-5"
+        style="max-width: 820px;">
+
+        <!-- Header -->
+        <div class="{% if doc.template == 'professional' or doc.template == 'ats' %}text-center{% endif %}
+                {% if doc.template == 'modern' %}border-bottom border-primary border-3 pb-3{% endif %}
+                {% if doc.template == 'professional' %}pb-3 mb-1{% endif %}
+                {% if doc.template == 'minimal' %}pb-2{% endif %}
+                {% if doc.template == 'ats' %}border-bottom pb-3{% endif %} mb-4">
+            <h1 class="fw-bold mb-1" style="font-size: 2rem;">{{ data.get('full_name') or 'Your Name' }}</h1>
+            {% set contact_line = [data.get('email'), data.get('phone'), data.get('location')] | select('ne', '') |
+            join(' | ') %}
+            {% if contact_line %}
+            <p class="mb-0 small text-secondary">{{ contact_line }}</p>
+            {% endif %}
+            {% set link_line = [data.get('linkedin'), data.get('github'), data.get('website')] | select('ne', '') |
+            join(' | ') %}
+            {% if link_line %}
+            <p class="mb-0 small text-secondary">{{ link_line }}</p>
+            {% endif %}
+        </div>
+
+        {% macro section(title) %}
+        <h5 class="fw-bold text-uppercase border-bottom pb-1 mt-4 mb-2"
+            style="font-size: 0.9rem; letter-spacing: 1px; color: #023e8a;">{{ title }}</h5>
+        {% endmacro %}
+
+        {% if data.get('summary') %}
+        {{ section('Professional Summary') }}
+        <p class="small mb-0" style="line-height: 1.6;">{{ data.get('summary') }}</p>
+        {% endif %}
+
+        {% if data.get('skills') %}
+        {{ section('Skills') }}
+        <p class="small mb-0">{{ data.get('skills') | join(' • ') }}</p>
+        {% endif %}
+
+        {% if data.get('experience') or data.get('internships') %}
+        {{ section('Professional Experience') }}
+        {% for e in (data.get('experience') or []) + (data.get('internships') or []) %}
+        <div class="mb-3">
+            <div class="d-flex justify-content-between flex-wrap">
+                <strong>{{ e.get('title') }}</strong>
+                <span class="text-secondary small">
+                    {{ [e.get('start'), e.get('end')] | select('ne', '') | join(' – ') }}
+                </span>
+            </div>
+            {% set meta = [e.get('company'), e.get('location')] | select('ne', '') | join(' · ') %}
+            {% if meta %}<div class="small text-secondary">{{ meta }}</div>{% endif %}
+            {% if e.get('bullets') %}
+            <ul class="small ps-4 mt-1 mb-0">
+                {% for b in e.get('bullets') %}<li>{{ b }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if data.get('projects') %}
+        {{ section('Projects') }}
+        {% for p in data.get('projects') %}
+        <div class="mb-3">
+            <strong>{{ p.get('name') }}</strong>
+            {% if p.get('tech') %}<span class="text-secondary small"> — {{ p.get('tech') }}</span>{% endif %}
+            {% if p.get('description') %}<p class="small mb-0 mt-1">{{ p.get('description') }}</p>{% endif %}
+            {% if p.get('link') %}<a href="{{ p.get('link') }}" target="_blank" rel="noopener" class="small">{{
+                p.get('link') }}</a>{% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if data.get('education') %}
+        {{ section('Education') }}
+        {% for ed in data.get('education') %}
+        <div class="mb-2">
+            <div class="d-flex justify-content-between flex-wrap">
+                <strong>{{ ed.get('degree') }}</strong>
+                <span class="text-secondary small">{{ [ed.get('start_year'), ed.get('end_year')] | select('ne', '') |
+                    join(' – ') }}</span>
+            </div>
+            {% set meta = [ed.get('institution'), ed.get('grade')] | select('ne', '') | join(' · ') %}
+            {% if meta %}<div class="small text-secondary">{{ meta }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if data.get('certifications') %}
+        {{ section('Certifications') }}
+        <ul class="small ps-4 mb-0">
+            {% for c in data.get('certifications') %}
+            <li>{{ c.get('name') }}{% if c.get('issuer') %} — {{ c.get('issuer') }}{% endif %}{% if c.get('year') %} ({{
+                c.get('year') }}){% endif %}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if data.get('achievements') %}
+        {{ section('Achievements') }}
+        <ul class="small ps-4 mb-0">
+            {% for a in data.get('achievements') %}<li>{{ a }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if data.get('languages') %}
+        {{ section('Languages') }}
+        <p class="small mb-0">{{ data.get('languages') | join(', ') }}</p>
+        {% endif %}
+
+        {% if not (data.get('summary') or data.get('skills') or data.get('experience') or data.get('internships')
+        or data.get('projects') or data.get('education') or data.get('certifications')
+        or data.get('achievements') or data.get('languages')) %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-journal-text display-5 d-block mb-2"></i>
+            This resume is empty. Go back to the editor and start filling in your details.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

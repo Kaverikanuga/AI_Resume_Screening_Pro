@@ -1,0 +1,24 @@
+<div class="entry-card p-3 rounded-3 mb-3 border border-secondary border-opacity-25 bg-dark bg-opacity-25">
+    <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-entry py-0 px-2" title="Remove entry">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="row g-2">
+        <div class="col-md-5">
+            <label class="form-label text-muted small fw-semibold mb-1">Certification Name</label>
+            <input type="text" class="form-control form-control-sm" data-efield="name" maxlength="150"
+                value="{{ (e or {}).get('name', '') }}" placeholder="AWS Certified Solutions Architect">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label text-muted small fw-semibold mb-1">Issuer</label>
+            <input type="text" class="form-control form-control-sm" data-efield="issuer" maxlength="120"
+                value="{{ (e or {}).get('issuer', '') }}" placeholder="Amazon Web Services">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label text-muted small fw-semibold mb-1">Year</label>
+            <input type="text" class="form-control form-control-sm" data-efield="year" maxlength="20"
+                value="{{ (e or {}).get('year', '') }}" placeholder="2024">
+        </div>
+    </div>
+</div>

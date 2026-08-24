@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Upload & Scan Resume - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="glass-card glass-card-glow p-4 p-sm-5 mb-4 text-center">
+        <div class="badge badge-info mb-2 py-1 px-3">REAL PDF PARSER & ATS ANALYZER</div>
+        <h2 class="fw-bold mb-2">Upload Your PDF Resume</h2>
+        <p class="text-muted mb-4">Our NLP parser will extract your technical skills, experience, education, and
+          calculate your real ATS score.</p>
+
+        <form method="POST" action="{{ url_for('scanner.upload') }}" enctype="multipart/form-data">
+          {{ form.hidden_tag() }}
+
+          <div class="upload-zone mb-4" id="uploadZone">
+            <i class="bi bi-cloud-arrow-up-fill display-2 text-primary d-block mb-2"></i>
+            <h4 class="fw-bold text-white mb-1">Drag & Drop Your PDF Resume Here</h4>
+            <p class="text-muted small mb-2">or click anywhere to select from your device</p>
+            <span class="badge bg-secondary bg-opacity-25 text-light px-3 py-1">Supports PDF (Max 10MB)</span>
+
+            {{ form.resume(class="d-none", id="resume", accept=".pdf") }}
+          </div>
+
+          <div id="fileNameDisplay" class="alert alert-info border-0 glass-card text-start d-none mb-4"></div>
+
+          {% if form.resume.errors %}
+          <div class="text-danger mb-3">{{ form.resume.errors[0] }}</div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-gradient btn-lg w-100 py-3 fw-bold">
+            <i class="bi bi-cpu-fill me-2"></i> Analyze & Calculate ATS Score
+          </button>
+        </form>
+      </div>
+
+      <!-- Previously Uploaded Resumes -->
+      {% if resumes %}
+      <div class="glass-card p-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-folder-fill text-warning me-2"></i> Your Previously Uploaded Resumes
+        </h5>
+        <div class="list-group list-group-flush bg-transparent">
+          {% for r in resumes %}
+          <div
+            class="list-group-item bg-transparent text-light border-secondary border-opacity-25 d-flex justify-content-between align-items-center py-3">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-file-earmark-pdf-fill text-danger fs-3 me-3"></i>
+              <div>
+                <h6 class="fw-bold mb-0 text-white">{{ r.original_filename }}</h6>
+                <small class="text-muted">Uploaded on {{ r.upload_date.strftime('%b %d, %Y') }}</small>
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+              <div class="text-end">
+                <span
+                  class="d-block fw-bold text-{{ 'success' if (r.ats_score or 0) >= 75 else ('warning' if (r.ats_score or 0) >= 50 else 'danger') }}">
+                  ATS: {{ r.ats_score or 0 }}/100
+                </span>
+              </div>
+              <a href="{{ url_for('scanner.analysis', resume_id=r.id) }}" class="btn btn-sm btn-outline-glass">View
+                Analysis</a>
+              <form method="POST" action="{{ url_for('scanner.delete_resume', resume_id=r.id) }}"
+                onsubmit="return confirm('Remove this resume from your account?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Remove resume">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

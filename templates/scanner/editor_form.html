@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Resume - {{ doc.title }} - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Sticky Toolbar -->
+    <div class="glass-card p-3 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+            <input type="text" id="docTitle" class="form-control fw-bold" style="max-width: 320px;"
+                value="{{ doc.title }}" maxlength="200" placeholder="Resume title">
+            <select id="docTemplate" class="form-select" style="max-width: 180px;">
+                {% for t in templates %}
+                <option value="{{ t }}" {{ 'selected' if data.get('template')==t }}>{{ t | capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span id="saveStatus" class="text-muted small me-1"><i class="bi bi-cloud-check me-1"></i> All changes
+                saved</span>
+            <button type="button" id="btnSave" class="btn btn-sm btn-gradient">
+                <i class="bi bi-save me-1"></i> Save
+            </button>
+            <button type="button" id="btnPreview" class="btn btn-sm btn-outline-glass">
+                <i class="bi bi-eye me-1"></i> Preview
+            </button>
+            <a href="{{ url_for('editor.export_pdf', doc_id=doc.id) }}" id="btnExport"
+                class="btn btn-sm btn-outline-glass">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+            </a>
+            <a href="{{ url_for('editor.index') }}" class="btn btn-sm btn-outline-glass">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- LEFT: Personal + Summary + Skills -->
+        <div class="col-lg-5">
+            <div class="glass-card p-4 mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-person-badge text-primary me-2"></i> Personal Information</h5>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Full Name</label>
+                    <input type="text" class="form-control doc-field" data-field="full_name" maxlength="150"
+                        value="{{ data.get('full_name', '') }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Email</label>
+                    <input type="email" class="form-control doc-field" data-field="email" maxlength="150"
+                        value="{{ data.get('email', '') }}">
+                </div>
+                <div class="row mb-3">
+                    <div class="col-6 mb-3 mb-md-0">
+                        <label class="form-label text-muted small fw-semibold">Phone</label>
+                        <input type="text" class="form-control doc-field" data-field="phone" maxlength="25"
+                            value="{{ data.get('phone', '') }}">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted small fw-semibold">Location</label>
+                        <input type="text" class="form-control doc-field" data-field="location" maxlength="150"
+                            value="{{ data.get('location', '') }}">
+                    </div>
+                </div>
+                <hr class="border-secondary border-opacity-25 my-3">
+                <h6 class="text-muted small fw-semibold text-uppercase mb-2">Social Links</h6>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">LinkedIn URL</label>
+                    <input type="url" class="form-control doc-field" data-field="linkedin" maxlength="300"
+                        value="{{ data.get('linkedin', '') }}" placeholder="https://linkedin.com/in/username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">GitHub URL</label>
+                    <input type="url" class="form-control doc-field" data-field="github" maxlength="300"
+                        value="{{ data.get('github', '') }}" placeholder="https://github.com/username">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label text-muted small fw-semibold">Portfolio / Website</label>
+                    <input type="url" class="form-control doc-field" data-field="website" maxlength="300"
+                        value="{{ data.get('website', '') }}" placeholder="https://yourportfolio.dev">
+                </div>
+            </div>
+
+            <div class="glass-card p-4 mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-file-text text-info me-2"></i> Professional Summary</h5>
+                <textarea class="form-control doc-field" data-field="summary" rows="5" maxlength="1500"
+                    placeholder="3–5 sentences naming your target role, experience, and core skills...">{{ data.get('summary', '') }}</textarea>
+            </div>
+
+            <div class="glass-card p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-tools text-warning me-2"></i> Skills</h5>
+                <textarea class="form-control doc-field" id="skillsInput" rows="4"
+                    placeholder="Python, React, SQL, Docker, Communication (comma separated)">{{ (data.get('skills') or []) | join(', ') }}</textarea>
+                <small class="text-muted d-block mt-2">Separate skills with commas. Aim for 10–20 relevant
+                    skills.</small>
+            </div>
+        </div>
+
+        <!-- RIGHT: Dynamic entry sections -->
+        <div class="col-lg-7">
+
+            <!-- EDUCATION -->
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-mortarboard text-success me-2"></i> Education</h5>
+                    <button type="button" class="btn btn-sm btn-outline-glass add-entry" data-section="education">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                <div class="entries-container" data-section="education">
+                    {% for e in data.get('education') or [] %}
+                    {% include 'scanner/_editor_entry_education.html' %}
+                    {% endfor %}
+                </div>
+                <template id="tpl-education">{% include 'scanner/_editor_entry_education.html' %}</template>
+            </div>
+
+            <!-- EXPERIENCE -->
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-briefcase text-primary me-2"></i> Work Experience</h5>
+                    <button type="button" class="btn btn-sm btn-outline-glass add-entry" data-section="experience">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                <div class="entries-container" data-section="experience">
+                    {% for e in data.get('experience') or [] %}
+                    {% include 'scanner/_editor_entry_experience.html' %}
+                    {% endfor %}
+                </div>
+                <template id="tpl-experience">{% include 'scanner/_editor_entry_experience.html' %}</template>
+            </div>
+
+            <!-- INTERNSHIPS -->
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-laptop text-info me-2"></i> Internships</h5>
+                    <button type="button" class="btn btn-sm btn-outline-glass add-entry" data-section="internships">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                <div class="entries-container" data-section="internships">
+                    {% for e in data.get('internships') or [] %}
+                    {% include 'scanner/_editor_entry_internship.html' %}
+                    {% endfor %}
+                </div>
+                <template id="tpl-internships">{% include 'scanner/_editor_entry_internship.html' %}</template>
+            </div>
+
+            <!-- PROJECTS -->
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-code-square text-warning me-2"></i> Projects</h5>
+                    <button type="button" class="btn btn-sm btn-outline-glass add-entry" data-section="projects">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                <div class="entries-container" data-section="projects">
+                    {% for e in data.get('projects') or [] %}
+                    {% include 'scanner/_editor_entry_project.html' %}
+                    {% endfor %}
+                </div>
+                <template id="tpl-projects">{% include 'scanner/_editor_entry_project.html' %}</template>
+            </div>
+
+            <!-- CERTIFICATIONS -->
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-patch-check text-success me-2"></i> Certifications</h5>
+                    <button type="button" class="btn btn-sm btn-outline-glass add-entry" data-section="certifications">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                <div class="entries-container" data-section="certifications">
+                    {% for e in data.get('certifications') or [] %}
+                    {% include 'scanner/_editor_entry_certification.html' %}
+                    {% endfor %}
+                </div>
+                <template id="tpl-certifications">{% include 'scanner/_editor_entry_certification.html' %}</template>
+            </div>
+
+            <!-- ACHIEVEMENTS & LANGUAGES -->
+            <div class="glass-card p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-trophy text-warning me-2"></i> Achievements & Languages</h5>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Achievements (one per line)</label>
+                    <textarea class="form-control doc-list" data-list="achievements" rows="4"
+                        placeholder="Winner, Smart India Hackathon 2024&#10;Published 2 research papers">{% for a in data.get('achievements') or [] %}{{ a }}
+{% endfor %}</textarea>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label text-muted small fw-semibold">Languages (one per line)</label>
+                    <textarea class="form-control doc-list" data-list="languages" rows="3"
+                        placeholder="English&#10;Hindi">{% for l in data.get('languages') or [] %}{{ l }}
+{% endfor %}</textarea>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const DOC_ID = parseInt("{{ doc.id }}", 10);
+        const CSRF = "{{ csrf_token() }}";
+        const SAVE_URL = "/editor/" + DOC_ID + "/save";
+        const AUTOSAVE_URL = "/editor/" + DOC_ID + "/autosave";
+        const PREVIEW_URL = "/editor/" + DOC_ID + "/preview";
+        const EXPORT_URL = document.getElementById('btnExport').href;
+
+        const statusEl = document.getElementById('saveStatus');
+        let dirty = false;
+        let saving = false;
+
+        function markDirty() {
+            dirty = true;
+            statusEl.innerHTML = '<i class="bi bi-pencil-fill text-warning me-1"></i> Unsaved changes';
+        }
+
+        function markSaved(msg) {
+            dirty = false;
+            statusEl.innerHTML = '<i class="bi bi-cloud-check text-success me-1"></i> ' + msg;
+        }
+
+        // ── Collect current editor state into the document JSON shape ──────────
+        function collect() {
+            const payload = { title: document.getElementById('docTitle').value.trim() || 'My Resume' };
+            const data = { template: document.getElementById('docTemplate').value };
+
+            document.querySelectorAll('.doc-field').forEach(el => {
+                data[el.dataset.field] = el.value.trim();
+            });
+
+            data.skills = (document.getElementById('skillsInput').value || '')
+                .split(',').map(s => s.trim()).filter(Boolean);
+
+            // Dynamic dict-style sections
+            ['education', 'experience', 'internships', 'projects', 'certifications'].forEach(section => {
+                const entries = [];
+                document.querySelectorAll('.entries-container[data-section="' + section + '"] .entry-card').forEach(card => {
+                    const entry = {};
+                    card.querySelectorAll('[data-efield]').forEach(inp => {
+                        entry[inp.dataset.efield] = inp.value.trim();
+                    });
+                    const bulletsEl = card.querySelector('[data-efield="bullets"]');
+                    if (bulletsEl) {
+                        entry.bullets = bulletsEl.value.split('\n').map(s => s.trim()).filter(Boolean);
+                    }
+                    if (Object.values(entry).some(v => (Array.isArray(v) ? v.length : v))) {
+                        entries.push(entry);
+                    }
+                });
+                data[section] = entries;
+            });
+
+            // Line-based list sections
+            document.querySelectorAll('.doc-list').forEach(el => {
+                data[el.dataset.list] = el.value.split('\n').map(s => s.trim()).filter(Boolean);
+            });
+
+            payload.data = data;
+            return payload;
+        }
+
+        // ── Save / autosave ────────────────────────────────────────────────────
+        function persist(url, isAutosave) {
+            if (saving) return Promise.resolve(false);
+            saving = true;
+            statusEl.innerHTML = '<span class="spinner-border spinner-border-sm text-info me-1"></span> Saving...';
+
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                body: JSON.stringify(collect())
+            })
+                .then(res => res.json())
+                .then(result => {
+                    saving = false;
+                    if (result.success) {
+                        markSaved(result.message);
+                        return true;
+                    }
+                    statusEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i> ' +
+                        (result.message || 'Save failed');
+                    return false;
+                })
+                .catch(() => {
+                    saving = false;
+                    statusEl.innerHTML = '<i class="bi bi-wifi-off text-danger me-1"></i> Network error';
+                    return false;
+                });
+        }
+
+        function saveManual() { return persist(SAVE_URL, false); }
+
+        // ── Wire up events ─────────────────────────────────────────────────────
+        document.getElementById('btnSave').addEventListener('click', saveManual);
+
+        document.getElementById('btnPreview').addEventListener('click', function () {
+            saveManual().then(ok => { if (ok) window.open(PREVIEW_URL, '_blank'); });
+        });
+
+        document.getElementById('btnExport').addEventListener('click', function (e) {
+            e.preventDefault();
+            saveManual().then(ok => { if (ok) window.location.href = EXPORT_URL; });
+        });
+
+        document.addEventListener('input', function (e) {
+            if (e.target.closest('#content') || e.target.matches('.doc-field, .doc-list, [data-efield], #skillsInput, #docTitle, #docTemplate')) {
+                markDirty();
+            }
+        }, true);
+
+        // Autosave every 25 seconds when there are unsaved changes
+        setInterval(function () {
+            if (dirty && !saving) persist(AUTOSAVE_URL, true);
+        }, 25000);
+
+        window.addEventListener('beforeunload', function (e) {
+            if (dirty) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        // ── Add / remove dynamic entries ───────────────────────────────────────
+        document.querySelectorAll('.add-entry').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const section = this.dataset.section;
+                const tpl = document.getElementById('tpl-' + section);
+                const container = document.querySelector('.entries-container[data-section="' + section + '"]');
+                if (tpl && container) {
+                    container.insertAdjacentHTML('beforeend', tpl.innerHTML);
+                    markDirty();
+                }
+            });
+        });
+
+        document.addEventListener('click', function (e) {
+            const removeBtn = e.target.closest('.remove-entry');
+            if (removeBtn) {
+                removeBtn.closest('.entry-card').remove();
+                markDirty();
+            }
+        });
+    })();
+</script>
+{% endblock %}

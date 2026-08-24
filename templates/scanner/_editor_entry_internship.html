@@ -1,0 +1,40 @@
+<div class="entry-card p-3 rounded-3 mb-3 border border-secondary border-opacity-25 bg-dark bg-opacity-25">
+    <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-entry py-0 px-2" title="Remove entry">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Internship Role</label>
+            <input type="text" class="form-control form-control-sm" data-efield="title" maxlength="150"
+                value="{{ (e or {}).get('title', '') }}" placeholder="Software Development Intern">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Organization</label>
+            <input type="text" class="form-control form-control-sm" data-efield="company" maxlength="150"
+                value="{{ (e or {}).get('company', '') }}" placeholder="Startup XYZ">
+        </div>
+        <div class="col-md-4 col-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Location</label>
+            <input type="text" class="form-control form-control-sm" data-efield="location" maxlength="100"
+                value="{{ (e or {}).get('location', '') }}" placeholder="Remote">
+        </div>
+        <div class="col-md-4 col-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Start</label>
+            <input type="text" class="form-control form-control-sm" data-efield="start" maxlength="30"
+                value="{{ (e or {}).get('start', '') }}" placeholder="May 2023">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label text-muted small fw-semibold mb-1">End</label>
+            <input type="text" class="form-control form-control-sm" data-efield="end" maxlength="30"
+                value="{{ (e or {}).get('end', '') }}" placeholder="Aug 2023">
+        </div>
+        <div class="col-12">
+            <label class="form-label text-muted small fw-semibold mb-1">Contribution Bullets (one per line)</label>
+            <textarea class="form-control form-control-sm" data-efield="bullets" rows="2"
+                placeholder="- Automated internal reporting, saving 10 hrs/week">{% for b in (e or {}).get('bullets') or [] %}{{ b }}
+{% endfor %}</textarea>
+        </div>
+    </div>
+</div>

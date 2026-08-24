@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}ATS-Friendly Resume Builder - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+      <div class="glass-card glass-card-glow p-4 p-sm-5 mb-4">
+        <div class="text-center mb-4">
+          <div class="badge badge-info mb-2 py-1 px-3">ATS-OPTIMIZED RESUME BUILDER</div>
+          <h2 class="fw-bold">Build an ATS-Friendly Resume</h2>
+          <p class="text-muted small">Fill in your professional details below to generate a clean, ATS-compliant resume preview.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('scanner.resume_builder') }}">
+          {{ form.hidden_tag() }}
+
+          <h5 class="fw-bold text-primary mb-3"><i class="bi bi-person-badge me-2"></i> Personal Information</h5>
+          <div class="row mb-3">
+            <div class="col-md-6 mb-3 mb-md-0">
+              <label class="form-label text-muted small fw-semibold">Full Name *</label>
+              {{ form.full_name(class="form-control") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted small fw-semibold">Email Address *</label>
+              {{ form.email(class="form-control") }}
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-6 mb-3 mb-md-0">
+              <label class="form-label text-muted small fw-semibold">Phone Number</label>
+              {{ form.phone(class="form-control") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted small fw-semibold">Location</label>
+              {{ form.location(class="form-control") }}
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-6 mb-3 mb-md-0">
+              <label class="form-label text-muted small fw-semibold">LinkedIn Profile URL</label>
+              {{ form.linkedin(class="form-control", placeholder="https://linkedin.com/in/username") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-muted small fw-semibold">GitHub Profile URL</label>
+              {{ form.github(class="form-control", placeholder="https://github.com/username") }}
+            </div>
+          </div>
+
+          <h5 class="fw-bold text-info mb-3"><i class="bi bi-file-earmark-text me-2"></i> Professional Summary & Skills</h5>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Professional Summary</label>
+            {{ form.summary(class="form-control", rows=4, placeholder="Write 3-4 sentences summarizing your core strengths and career goals...") }}
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label text-muted small fw-semibold">Technical & Soft Skills (Comma-separated)</label>
+            {{ form.skills(class="form-control", placeholder="Python, Java, React, SQL, Problem Solving, Team Leadership") }}
+          </div>
+
+          <h5 class="fw-bold text-warning mb-3"><i class="bi bi-palette me-2"></i> Template Selection</h5>
+          <div class="mb-4">
+            {{ form.template(class="form-select") }}
+          </div>
+
+          <button type="submit" class="btn btn-gradient btn-lg w-100 py-3 fw-bold">
+            Generate Live ATS Preview <i class="bi bi-eye ms-1"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ResumeAI Pro - AI Resume Screening{% endblock %}</title>
+  <meta name="description"
+    content="AI-Powered ATS Optimization & Resume Screening Platform. Analyze, optimize, and perfect your resume with real ATS scoring and AI rejection insights.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Chart.js (pinned version for stability) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+  {% if current_user.is_authenticated %}
+  <!-- Authenticated Layout: ResumeAI Pro Left Sidebar Dashboard -->
+  <div class="app-container">
+    <!-- Left Sidebar -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-header d-flex align-items-center justify-content-between">
+        <a class="sidebar-brand" href="{{ url_for('main.dashboard') }}">
+          <i class="bi bi-cpu-fill text-primary me-1"></i> ResumeAI <span class="badge bg-primary ms-1"
+            style="font-size:0.55rem;">PRO</span>
+        </a>
+        <button class="btn btn-sm btn-link text-muted d-lg-none p-0" id="sidebarCloseBtn">
+          <i class="bi bi-x-lg fs-5"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="sidebar-label">Main Navigation</div>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'main.dashboard' }}"
+          href="{{ url_for('main.dashboard') }}">
+          <i class="bi bi-speedometer2 text-primary"></i> Dashboard
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.upload' }}"
+          href="{{ url_for('scanner.upload') }}">
+          <i class="bi bi-cloud-arrow-up text-info"></i> Upload Resume
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.job_match' }}"
+          href="{{ url_for('scanner.job_match') }}">
+          <i class="bi bi-crosshair text-danger"></i> Job Match
+        </a>
+
+        <div class="sidebar-label mt-2">AI Optimization Tools</div>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.resume_builder' }}"
+          href="{{ url_for('scanner.resume_builder') }}">
+          <i class="bi bi-journal-code text-warning"></i> Resume Builder
+        </a>
+        {% set latest_r = current_user.latest_resume() %}
+        {% if latest_r %}
+        <a class="sidebar-link {{ 'active' if request.endpoint and (request.endpoint == 'editor.index' or request.endpoint.startswith('editor.')) }}"
+          href="{{ url_for('editor.index') }}">
+          <i class="bi bi-pencil-square text-secondary"></i> Resume Editor
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.linkedin' }}"
+          href="{{ url_for('scanner.linkedin', resume_id=latest_r.id) }}">
+          <i class="bi bi-linkedin text-info"></i> LinkedIn Optimizer
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.naukri' }}"
+          href="{{ url_for('scanner.naukri', resume_id=latest_r.id) }}">
+          <i class="bi bi-building text-warning"></i> Naukri Optimizer
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.career' }}"
+          href="{{ url_for('scanner.career', resume_id=latest_r.id) }}">
+          <i class="bi bi-compass text-success"></i> AI Career Assistant
+        </a>
+        {% else %}
+        <a class="sidebar-link text-muted" href="{{ url_for('editor.index') }}" title="Create a resume with the editor">
+          <i class="bi bi-pencil-square opacity-50"></i> Resume Editor
+        </a>
+        <a class="sidebar-link text-muted" href="{{ url_for('scanner.upload') }}" title="Upload resume first">
+          <i class="bi bi-linkedin opacity-50"></i> LinkedIn Optimizer
+        </a>
+        <a class="sidebar-link text-muted" href="{{ url_for('scanner.upload') }}" title="Upload resume first">
+          <i class="bi bi-building opacity-50"></i> Naukri Optimizer
+        </a>
+        <a class="sidebar-link text-muted" href="{{ url_for('scanner.upload') }}" title="Upload resume first">
+          <i class="bi bi-compass opacity-50"></i> AI Career Assistant
+        </a>
+        {% endif %}
+
+        <div class="sidebar-label mt-2">Reports & Account</div>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'scanner.reports_hub' }}"
+          href="{{ url_for('scanner.reports_hub') }}">
+          <i class="bi bi-file-earmark-pdf text-danger"></i> Reports Hub
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'main.history' }}"
+          href="{{ url_for('main.history') }}">
+          <i class="bi bi-clock-history text-secondary"></i> History
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'main.pricing' }}"
+          href="{{ url_for('main.pricing') }}">
+          <i class="bi bi-gem text-warning"></i> Pricing & Upgrade
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'main.profile' }}"
+          href="{{ url_for('main.profile') }}">
+          <i class="bi bi-person text-light"></i> Profile
+        </a>
+        <a class="sidebar-link {{ 'active' if request.endpoint == 'main.settings' }}"
+          href="{{ url_for('main.settings') }}">
+          <i class="bi bi-gear text-secondary"></i> Settings
+        </a>
+        <a class="sidebar-link text-danger mt-2" href="{{ url_for('auth.logout') }}">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="fw-bold text-white small">{{ current_user.name.split()[0] }}</div>
+            <small class="text-muted" style="font-size:0.7rem;">{{ current_user.email }}</small>
+          </div>
+          <span class="badge bg-primary text-uppercase" style="font-size:0.6rem;">{{ current_user.get_plan() }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Main Content Area -->
+    <div class="app-main">
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-outline-glass btn-sm d-lg-none py-1 px-2" id="sidebarToggleBtn">
+            <i class="bi bi-list fs-5"></i>
+          </button>
+          <span class="fw-semibold text-light fs-6 d-none d-sm-inline">ResumeAI Pro Dashboard</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <a href="{{ url_for('scanner.upload') }}" class="btn btn-sm btn-gradient py-1 px-3"
+            style="font-size:0.85rem;">
+            <i class="bi bi-cloud-upload me-1"></i> Scan Resume
+          </a>
+          <a href="{{ url_for('main.pricing') }}" class="btn btn-sm btn-outline-glass py-1 px-2 text-warning"
+            style="font-size:0.85rem;">
+            <i class="bi bi-gem me-1"></i> {{ current_user.get_plan().upper() }}
+          </a>
+        </div>
+      </header>
+
+      <!-- Flash Messages -->
+      <div class="container-fluid px-4 mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div
+          class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show glass-card border-0 mb-3"
+          role="alert">
+          <i
+            class="bi {{ 'bi-check-circle-fill text-success' if category == 'success' else ('bi-exclamation-triangle-fill text-warning' if category == 'warning' else ('bi-info-circle-fill text-info' if category == 'info' else 'bi-x-circle-fill text-danger')) }} me-2"></i>
+          {{ message }}
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+      </div>
+
+      {% else %}
+
+      <!-- Unauthenticated Navbar Header -->
+      <nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="{{ url_for('main.index') }}">
+            <i class="bi bi-cpu-fill text-primary me-1"></i> ResumeAI <span class="badge bg-primary text-wrap ms-1"
+              style="font-size:0.6rem;">PRO</span>
+          </a>
+
+          <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+
+          <div class="collapse navbar-collapse" id="navbarMain">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}#features">Features</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}#how-it-works">How It Works</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}#testimonials">Reviews</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}#faq">FAQ</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.pricing') }}"><i
+                    class="bi bi-gem me-1 text-warning"></i> Pricing</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('main.contact') }}">Contact</a></li>
+            </ul>
+
+            <div class="d-flex align-items-center gap-2">
+              <a href="{{ url_for('auth.login') }}" class="btn btn-outline-glass">Sign In</a>
+              <a href="{{ url_for('auth.register') }}" class="btn btn-gradient">Get Started Free</a>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="container mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div
+          class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show glass-card border-0 mb-3"
+          role="alert">
+          <i
+            class="bi {{ 'bi-check-circle-fill text-success' if category == 'success' else ('bi-exclamation-triangle-fill text-warning' if category == 'warning' else ('bi-info-circle-fill text-info' if category == 'info' else 'bi-x-circle-fill text-danger')) }} me-2"></i>
+          {{ message }}
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+      </div>
+
+      {% endif %}
+
+      <!-- Single Content Block -->
+      <main class="{{ 'flex-grow-1 px-4' if current_user.is_authenticated else 'flex-grow-1' }}">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer>
+        <div class="container-fluid py-3">
+          <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-2 small">
+            {% if current_user.is_authenticated %}
+            <a href="{{ url_for('scanner.reports_hub') }}" class="text-light text-opacity-75 text-decoration-none">Reports</a>
+            <a href="{{ url_for('main.history') }}" class="text-light text-opacity-75 text-decoration-none">History</a>
+            <a href="{{ url_for('main.settings') }}" class="text-light text-opacity-75 text-decoration-none">Settings</a>
+            {% else %}
+            <a href="{{ url_for('main.index') }}#features" class="text-light text-opacity-75 text-decoration-none">Features</a>
+            <a href="{{ url_for('main.index') }}#how-it-works" class="text-light text-opacity-75 text-decoration-none">How It Works</a>
+            <a href="{{ url_for('main.index') }}#faq" class="text-light text-opacity-75 text-decoration-none">FAQ</a>
+            {% endif %}
+            <a href="{{ url_for('main.pricing') }}" class="text-light text-opacity-75 text-decoration-none">Pricing</a>
+            <a href="{{ url_for('main.contact') }}" class="text-light text-opacity-75 text-decoration-none">Contact</a>
+          </div>
+          <p class="mb-0 text-light text-opacity-75 text-center" style="font-size:0.85rem;">
+            &copy; {{ now().year }} AI Resume Screening Pro &mdash; Transform Your Resume Into a Job Magnet. All rights
+            reserved.
+          </p>
+        </div>
+      </footer>
+
+      {% if current_user.is_authenticated %}
+    </div> <!-- close app-main -->
+  </div> <!-- close app-container -->
+  {% endif %}
+
+  <!-- Bootstrap 5 Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Custom JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggleBtn = document.getElementById('sidebarToggleBtn');
+      const closeBtn = document.getElementById('sidebarCloseBtn');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      const sidebar = () => document.getElementById('appSidebar');
+
+      const openSidebar = () => { sidebar() && sidebar().classList.add('show'); backdrop && backdrop.classList.add('show'); };
+      const closeSidebarFn = () => { sidebar() && sidebar().classList.remove('show'); backdrop && backdrop.classList.remove('show'); };
+
+      if (toggleBtn) toggleBtn.addEventListener('click', openSidebar);
+      if (closeBtn) closeBtn.addEventListener('click', closeSidebarFn);
+      if (backdrop) backdrop.addEventListener('click', closeSidebarFn);
+    });
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

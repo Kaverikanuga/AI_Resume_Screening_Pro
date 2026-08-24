@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Resume Editor - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <div class="badge badge-info mb-1 py-1 px-3">PROFESSIONAL RESUME EDITOR</div>
+            <h2 class="fw-extrabold mb-0">My Resume Documents</h2>
+            <p class="text-muted small mb-0">Create, edit, duplicate, preview, and export ATS-friendly resumes with
+                autosave.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('editor.create') }}" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="title" class="form-control" placeholder="Resume title (e.g. SDE Role 2026)"
+                maxlength="200" style="min-width: 240px;">
+            <button type="submit" class="btn btn-gradient text-nowrap">
+                <i class="bi bi-plus-lg me-1"></i> New Resume
+            </button>
+        </form>
+    </div>
+
+    {% if docs %}
+    <div class="row g-4">
+        {% for doc in docs %}
+        <div class="col-md-6 col-lg-4">
+            <div class="glass-card h-100 p-4 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="fw-bold text-white mb-0 text-truncate" title="{{ doc.title }}">{{ doc.title }}</h5>
+                    <span class="badge bg-dark border border-secondary text-uppercase ms-2">{{ doc.template }}</span>
+                </div>
+                <small class="text-muted d-block mb-3">
+                    <i class="bi bi-clock me-1"></i> Updated {{ doc.updated_at.strftime('%b %d, %Y %H:%M') }}
+                </small>
+
+                {% set d = doc.get_data() %}
+                <div class="text-muted small mb-3 flex-grow-1">
+                    <div><i class="bi bi-briefcase me-2"></i>{{ (d.get('experience') or []) | length }} experience · {{
+                        (d.get('internships') or []) | length }} internships</div>
+                    <div><i class="bi bi-mortarboard me-2"></i>{{ (d.get('education') or []) | length }} education
+                        entries</div>
+                    <div><i class="bi bi-code-square me-2"></i>{{ (d.get('projects') or []) | length }} projects · {{
+                        (d.get('skills') or []) | length }} skills</div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('editor.edit', doc_id=doc.id) }}" class="btn btn-sm btn-gradient flex-grow-1">
+                        <i class="bi bi-pencil me-1"></i> Edit
+                    </a>
+                    <a href="{{ url_for('editor.preview', doc_id=doc.id) }}" target="_blank"
+                        class="btn btn-sm btn-outline-glass">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="{{ url_for('editor.export_pdf', doc_id=doc.id) }}" class="btn btn-sm btn-outline-glass"
+                        title="Export PDF">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                </div>
+
+                <hr class="border-secondary border-opacity-25 my-3">
+
+                <div class="d-flex gap-2">
+                    <form method="POST" action="{{ url_for('editor.duplicate', doc_id=doc.id) }}" class="flex-grow-1">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-glass w-100"><i class="bi bi-copy me-1"></i>
+                            Duplicate</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('editor.delete', doc_id=doc.id) }}"
+                        onsubmit="return confirm('Delete this resume permanently?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="glass-card glass-card-glow text-center p-5 my-4">
+        <i class="bi bi-journal-plus display-2 text-primary mb-3"></i>
+        <h3 class="fw-bold">No Resumes Yet</h3>
+        <p class="text-muted mb-4">Create your first resume document — fill in sections once and export unlimited clean
+            PDFs.</p>
+        <form method="POST" action="{{ url_for('editor.create') }}" class="d-inline-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="title" class="form-control" placeholder="Resume title" maxlength="200">
+            <button type="submit" class="btn btn-gradient px-4">Create Now <i
+                    class="bi bi-arrow-right ms-1"></i></button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

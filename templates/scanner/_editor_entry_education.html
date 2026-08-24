@@ -1,0 +1,34 @@
+<div class="entry-card p-3 rounded-3 mb-3 border border-secondary border-opacity-25 bg-dark bg-opacity-25">
+    <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-entry py-0 px-2" title="Remove entry">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Degree / Qualification</label>
+            <input type="text" class="form-control form-control-sm" data-efield="degree" maxlength="150"
+                value="{{ (e or {}).get('degree', '') }}" placeholder="B.Tech in Computer Science">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Institution</label>
+            <input type="text" class="form-control form-control-sm" data-efield="institution" maxlength="150"
+                value="{{ (e or {}).get('institution', '') }}" placeholder="ABC University">
+        </div>
+        <div class="col-md-4 col-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Start Year</label>
+            <input type="text" class="form-control form-control-sm" data-efield="start_year" maxlength="20"
+                value="{{ (e or {}).get('start_year', '') }}" placeholder="2019">
+        </div>
+        <div class="col-md-4 col-6">
+            <label class="form-label text-muted small fw-semibold mb-1">End Year</label>
+            <input type="text" class="form-control form-control-sm" data-efield="end_year" maxlength="20"
+                value="{{ (e or {}).get('end_year', '') }}" placeholder="2023">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label text-muted small fw-semibold mb-1">Grade / CGPA</label>
+            <input type="text" class="form-control form-control-sm" data-efield="grade" maxlength="50"
+                value="{{ (e or {}).get('grade', '') }}" placeholder="8.5 CGPA">
+        </div>
+    </div>
+</div>

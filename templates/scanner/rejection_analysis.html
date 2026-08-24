@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}AI Screening-Based Rejection Reasons - {{ match_record.job_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Disclaimer Alert (exact product-required wording) -->
+  <div class="alert glass-card border-warning border-opacity-50 text-warning mb-4" role="alert">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+        <div>
+          <strong class="d-block text-white">This analysis is AI-generated guidance and does not represent an actual
+            employer hiring decision.</strong>
+          <small class="text-warning-50">{{ rejection.disclaimer }}</small>
+        </div>
+      </div>
+      <a href="{{ url_for('scanner.download_rejection_report', job_match_id=match_record.id) }}"
+        class="btn btn-gradient text-nowrap">
+        <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF Report
+      </a>
+    </div>
+  </div>
+
+  <!-- Main Banner Header -->
+  <div class="rejection-banner mb-4">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <div
+          class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 px-3 py-1 mb-2 fs-6">
+          {{ rejection.rejection_status }}
+        </div>
+
+        <h1 class="fw-extrabold text-white mb-2">
+          {{ rejection.rejection_status_icon }} {{ rejection.rejection_status }}
+        </h1>
+        <h5 class="text-muted fw-normal mb-3">Job Role: <strong>{{ match_record.job_title }}</strong> ({{
+          match_record.company or 'Target Role' }})</h5>
+
+        <div class="d-flex flex-wrap gap-4 align-items-center">
+          <div>
+            <span class="text-muted small d-block">Overall Match Score</span>
+            <span class="display-6 fw-extrabold text-danger">{{ rejection.match_percentage }}%</span>
+          </div>
+
+          <div class="border-start border-secondary border-opacity-25 ps-4">
+            <span class="text-muted small d-block">Estimated ATS Risk</span>
+            <span class="display-6 fw-extrabold text-warning">{{ rejection.rejection_risk }}%</span>
+          </div>
+
+          <div class="border-start border-secondary border-opacity-25 ps-4">
+            <span class="text-muted small d-block">Identified Issues</span>
+            <span class="display-6 fw-extrabold text-light">{{ rejection.total_issues }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Improvement Highlight Card -->
+      <div class="col-md-4 mt-3 mt-md-0">
+        <div class="glass-card p-4 text-center border-primary border-opacity-50"
+          style="background: rgba(59, 130, 246, 0.1);">
+          <span class="text-muted small d-block fw-semibold text-uppercase mb-1">ESTIMATED IMPROVED MATCH SCORE</span>
+
+          <div class="d-flex align-items-center justify-content-center gap-2 my-2">
+            <span class="display-6 fw-bold text-muted">{{ rejection.match_percentage }}%</span>
+            <i class="bi bi-arrow-right fs-3 text-primary"></i>
+            <span class="display-5 fw-extrabold text-success">{{ rejection.estimated_improved_match }}%</span>
+          </div>
+
+          <span class="badge badge-success py-1 px-3 mt-1">+{{ rejection.improvement_delta }}% Score Increase
+            Potential</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Primary Rejection Reason Box -->
+  <div class="glass-card p-4 mb-4 border-danger border-opacity-25" style="background: rgba(244, 63, 94, 0.05);">
+    <h5 class="fw-bold text-danger mb-2">
+      <i class="bi bi-exclamation-octagon-fill me-2"></i> Primary Rejection Reason
+    </h5>
+    <p class="text-light lead mb-0 fs-6">{{ rejection.primary_reason }}</p>
+  </div>
+
+  <!-- Rejection Reasons Section -->
+  <div class="mb-5">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h4 class="fw-bold mb-0">
+        <i class="bi bi-shield-x text-danger me-2"></i> AI Screening-Based Rejection Reasons
+      </h4>
+      <span class="text-muted small">Likely Rejection Reasons Based on Resume and Job Description</span>
+    </div>
+
+    <!-- Critical Issues -->
+    {% if rejection.critical_reasons %}
+    <h6 class="text-danger fw-bold text-uppercase mb-2"><i class="bi bi-x-circle-fill me-1"></i> Critical Issues (High
+      Rejection Impact)</h6>
+    {% for reason in rejection.critical_reasons %}
+    <div class="reason-card-critical">
+      <h6 class="fw-bold text-danger mb-1">{{ reason.icon }} {{ reason.title }}</h6>
+      <p class="mb-0 text-light small">→ {{ reason.description }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Major Issues -->
+    {% if rejection.major_reasons %}
+    <h6 class="text-warning fw-bold text-uppercase mt-4 mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Major
+      Issues (Moderate Rejection Risk)</h6>
+    {% for reason in rejection.major_reasons %}
+    <div class="reason-card-major">
+      <h6 class="fw-bold text-warning mb-1">{{ reason.icon }} {{ reason.title }}</h6>
+      <p class="mb-0 text-light small">→ {{ reason.description }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Minor Issues -->
+    {% if rejection.minor_issues %}
+    <h6 class="text-info fw-bold text-uppercase mt-4 mb-2"><i class="bi bi-info-circle-fill me-1"></i> Minor Issues &
+      Formatting Concerns</h6>
+    {% for reason in rejection.minor_issues %}
+    <div class="reason-card-minor">
+      <h6 class="fw-bold text-info mb-1">{{ reason.icon }} {{ reason.title }}</h6>
+      <p class="mb-0 text-light small">→ {{ reason.description }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Section Scores -->
+  {% if ats_data and ats_data.get('component_scores') %}
+  <div class="glass-card p-4 mb-5">
+    <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-steps text-info me-2"></i> Resume Section Scores</h5>
+    <div class="row g-2">
+      {% for section, score in ats_data.get('component_scores', {}).items() %}
+      <div class="col-md-3 col-sm-6">
+        <div class="p-3 glass-card rounded-3 border-0 bg-dark bg-opacity-50 h-100">
+          <small class="text-muted d-block mb-1">{{ section }}</small>
+          <strong
+            class="fs-5 text-{{ 'success' if (score or 0) >= 70 else ('warning' if (score or 0) >= 45 else 'danger') }}">{{
+            score or 0 }}/100</strong>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <hr class="border-secondary border-opacity-25 my-3">
+    <div class="d-flex flex-wrap gap-4 small">
+      <span class="text-muted"><i class="bi bi-spellcheck me-1"></i> Grammar Score: <strong class="text-light">{{
+          ats_data.get('grammar_score', '—') }}/100</strong></span>
+      <span class="text-muted"><i class="bi bi-eye me-1"></i> Readability Score: <strong class="text-light">{{
+          ats_data.get('readability_score', '—') }}/100</strong></span>
+      <span class="text-muted"><i class="bi bi-layout-text-window-reverse me-1"></i> Formatting Score: <strong
+          class="text-light">{{ ats_data.get('formatting_score', '—') }}/100</strong></span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Missing Skills & Missing Keywords Grid -->
+  <div class="row g-4 mb-5">
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-danger mb-3">
+          <i class="bi bi-tags-fill me-2"></i> Missing Required Skills ({{ rejection.missing_skills | length }})
+        </h5>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for skill in rejection.missing_skills %}
+          <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-2 px-3">{{
+            skill }}</span>
+          {% else %}
+          <span class="text-muted small">No critical missing skills.</span>
+          {% endfor %}
+        </div>
+        <small class="text-muted d-block">Adding these missing skills directly to your resume will boost your ATS
+          keyword score.</small>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-warning mb-3">
+          <i class="bi bi-key-fill me-2"></i> High-Frequency Job Keywords Missing
+        </h5>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for kw in rejection.missing_keywords %}
+          <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-2 px-3">{{
+            kw }}</span>
+          {% else %}
+          <span class="text-muted small">Good keyword density!</span>
+          {% endfor %}
+        </div>
+        <small class="text-muted d-block">Incorporate these terms naturally into your experience bullet points.</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- How To Improve Section -->
+  <div class="glass-card p-4 p-lg-5 mb-4 border-success border-opacity-25">
+    <h4 class="fw-bold text-success mb-4">
+      <i class="bi bi-check2-square me-2"></i> HOW TO IMPROVE (Action Checklist)
+    </h4>
+
+    <div class="row g-3 mb-4">
+      {% for imp in rejection.improvements %}
+      <div class="col-md-6">
+        <div class="p-3 glass-card rounded-3 border-0 bg-success bg-opacity-10 d-flex align-items-start gap-2">
+          <i class="bi bi-check-lg text-success fs-5"></i>
+          <span class="text-light small fw-semibold">{{ imp }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Dynamic Estimated Score Comparison -->
+    <div class="p-4 glass-card rounded-3 text-center border-primary border-opacity-25 bg-dark bg-opacity-50">
+      <h5 class="fw-bold text-white mb-2">ESTIMATED IMPROVED MATCH SCORE</h5>
+      <p class="text-muted small mb-3">If you execute the recommendations above, your estimated match score will
+        increase from:</p>
+
+      <div
+        class="d-inline-flex align-items-center gap-3 p-3 rounded-pill bg-dark border border-secondary border-opacity-25 px-4">
+        <span class="fs-4 fw-bold text-danger">{{ rejection.match_percentage }}% (Current)</span>
+        <i class="bi bi-arrow-right fs-4 text-primary"></i>
+        <span class="fs-3 fw-extrabold text-success">{{ rejection.estimated_improved_match }}% (After
+          Improvements)</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Naukri Optimization - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <div class="badge badge-info mb-1 py-1 px-3">NAUKRI.COM SEARCH RANKING OPTIMIZER</div>
+      <h2 class="fw-extrabold mb-0">Naukri Recruiter Visibility Report</h2>
+      <p class="text-muted small mb-0">Optimization recommendations based on resume data for candidate: {{
+        resume.original_filename }}</p>
+    </div>
+
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-glass">
+      <i class="bi bi-arrow-left me-1"></i> Dashboard
+    </a>
+  </div>
+
+  <!-- Score Header Banner -->
+  <div class="glass-card glass-card-glow p-4 mb-4">
+    <div class="row align-items-center">
+      <div class="col-md-3 text-center mb-3 mb-md-0">
+        <div class="score-circle-wrap">
+          <svg class="score-circle-svg" viewBox="0 0 100 100">
+            <circle class="score-circle-bg" cx="50" cy="50" r="40" />
+            <circle class="score-circle-val" cx="50" cy="50" r="40" stroke-dasharray="251.2"
+              stroke-dashoffset="{{ 251.2 - (251.2 * report.naukri_score / 100) }}" />
+          </svg>
+          <div class="score-number">{{ report.naukri_score }}<span class="fs-6 text-muted">%</span></div>
+        </div>
+        <div class="mt-2 fw-semibold text-light">Naukri Score</div>
+      </div>
+
+      <div class="col-md-9">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <h4 class="fw-bold mb-0">Search Visibility:</h4>
+          <span class="badge bg-{{ 'success' if report.search_visibility == 'High' else 'warning' }} fs-6 py-1 px-3">{{
+            report.search_visibility }}</span>
+        </div>
+        <p class="text-muted mb-3">Recruiters filter resumes on Naukri based on key skills, update frequency, notice
+          period, and keyword density.</p>
+
+        <!-- Score Breakdown -->
+        <div class="d-flex flex-wrap gap-2">
+          {% for key, val in report.score_breakdown.items() %}
+          <span class="badge bg-dark border border-secondary text-light">
+            {{ key }}: <strong class="text-info">+{{ val }} pts</strong>
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyword Density Card -->
+  {% if report.keyword_density %}
+  <div class="glass-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <h6 class="text-muted small fw-semibold text-uppercase mb-1">Keyword Density</h6>
+        <p class="mb-0 text-muted small">{{ report.keyword_density.description }}</p>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span class="badge badge-{{ report.keyword_density.color }} fs-6 py-2 px-3">{{ report.keyword_density.level
+          }}</span>
+        <strong class="fs-3 fw-extrabold">{{ report.keyword_density.score }}<span
+            class="fs-6 text-muted">/100</span></strong>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-4 mb-4">
+    <!-- Ranking Improvements -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-warning mb-3"><i class="bi bi-graph-up-arrow me-2"></i> Ranking Improvement Actions</h5>
+        <div class="space-y-3">
+          {% for tip in report.ranking_tips %}
+          <div class="p-3 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-white small">{{ tip.title }}</strong>
+              <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-1 px-2">{{ tip.impact }} Impact</span>
+            </div>
+            <p class="text-muted small mb-0">{{ tip.description }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Missing Popular Keywords -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-danger mb-3"><i class="bi bi-tags-fill me-2"></i> Popular Naukri Keywords Missing</h5>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for kw in report.missing_keywords %}
+          <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-2 px-3">{{ kw
+            }}</span>
+          {% else %}
+          <span class="text-muted small">No major missing keywords!</span>
+          {% endfor %}
+        </div>
+
+        <h6 class="fw-bold text-success mt-4 mb-2"><i class="bi bi-lightbulb-fill me-1"></i> Recruiter Response
+          Recommendations</h6>
+        <ul class="list-unstyled space-y-2">
+          {% for rec in report.recommendations %}
+          <li class="p-2 glass-card rounded-3 mb-2 border-0 bg-success bg-opacity-10 text-light small">
+            ✓ {{ rec }}
+          </li>
+          {% endfor %}
+        </ul>
+
+        {% if report.recruiter_tips %}
+        <h6 class="fw-bold text-info mt-4 mb-2"><i class="bi bi-headset me-1"></i> Recruiter Response Playbook</h6>
+        <ul class="list-unstyled space-y-2 mb-0">
+          {% for tip in report.recruiter_tips %}
+          <li class="p-2 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small">
+            📞 {{ tip }}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

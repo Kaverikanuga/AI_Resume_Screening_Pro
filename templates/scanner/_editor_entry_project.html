@@ -1,0 +1,29 @@
+<div class="entry-card p-3 rounded-3 mb-3 border border-secondary border-opacity-25 bg-dark bg-opacity-25">
+    <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-entry py-0 px-2" title="Remove entry">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Project Name</label>
+            <input type="text" class="form-control form-control-sm" data-efield="name" maxlength="150"
+                value="{{ (e or {}).get('name', '') }}" placeholder="AI Resume Screener">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1">Tech Stack</label>
+            <input type="text" class="form-control form-control-sm" data-efield="tech" maxlength="200"
+                value="{{ (e or {}).get('tech', '') }}" placeholder="Python, Flask, React, PostgreSQL">
+        </div>
+        <div class="col-12">
+            <label class="form-label text-muted small fw-semibold mb-1">Description</label>
+            <textarea class="form-control form-control-sm" data-efield="description" rows="2" maxlength="700"
+                placeholder="What it does, your role, and one measurable outcome...">{{ (e or {}).get('description', '') }}</textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-label text-muted small fw-semibold mb-1">Link (optional)</label>
+            <input type="url" class="form-control form-control-sm" data-efield="link" maxlength="300"
+                value="{{ (e or {}).get('link', '') }}" placeholder="https://github.com/username/project">
+        </div>
+    </div>
+</div>

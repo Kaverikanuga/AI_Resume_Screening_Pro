@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Job Match Result - {{ match_record.job_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <div class="badge badge-info mb-1 py-1 px-3">JOB MATCH RESULTS</div>
+      <h2 class="fw-extrabold mb-0">{{ match_record.job_title }}</h2>
+      <p class="text-muted small mb-0">Company: {{ match_record.company or 'Not specified' }} | Resume: {{ resume.original_filename }}</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      {% if match_record.decision != 'RECOMMENDED' %}
+        <a href="{{ url_for('scanner.rejection_analysis', job_match_id=match_record.id) }}" class="btn btn-gradient">
+          <i class="bi bi-x-octagon-fill me-1"></i> AI Rejection Analyzer
+        </a>
+      {% endif %}
+      <a href="{{ url_for('scanner.job_match') }}" class="btn btn-outline-glass">
+        <i class="bi bi-arrow-left me-1"></i> Match Another Job
+      </a>
+    </div>
+  </div>
+
+  <!-- Overall Match Banner -->
+  <div class="glass-card glass-card-glow p-4 mb-4">
+    <div class="row align-items-center text-center text-md-start">
+      <div class="col-md-3 text-center mb-3 mb-md-0">
+        <div class="score-circle-wrap">
+          <svg class="score-circle-svg" viewBox="0 0 100 100">
+            <circle class="score-circle-bg" cx="50" cy="50" r="40" />
+            <circle class="score-circle-val" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="{{ 251.2 - (251.2 * (match_data.overall_match or 0) / 100) }}" />
+          </svg>
+          <div class="score-number">{{ match_data.overall_match or 0 }}<span class="fs-6 text-muted">%</span></div>
+        </div>
+        <div class="mt-2 fw-semibold text-light">Overall Match</div>
+      </div>
+
+      <div class="col-md-9">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+          <h3 class="fw-bold mb-0">Application Recommendation:</h3>
+          <span class="badge badge-{{ match_data.decision_color or 'danger' }} fs-5 py-2 px-3">
+            {{ match_data.decision_label or 'NOT RECOMMENDED' }}
+          </span>
+        </div>
+
+        <p class="text-muted mb-3 fs-6">
+          Job Readiness Score: <strong>{{ match_data.job_readiness }}%</strong> | Skill Gap: <strong>{{ match_data.skill_gap }} missing skill(s)</strong>
+        </p>
+
+        {% if match_record.decision != 'RECOMMENDED' %}
+          <div class="p-3 glass-card rounded-3 border-danger border-opacity-25 bg-danger bg-opacity-10 d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+              <strong class="text-white d-block">❌ Application Not Recommended</strong>
+              <small class="text-muted">AI Screening detected critical skill or keyword gaps that may trigger ATS filtering.</small>
+            </div>
+            <a href="{{ url_for('scanner.rejection_analysis', job_match_id=match_record.id) }}" class="btn btn-sm btn-gradient py-2 px-3">
+              View AI Screening Rejection Reasons <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Metric Cards Grid -->
+  <div class="row g-4 mb-4">
+    <!-- Matching Skills -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-success mb-3">
+          <i class="bi bi-check-circle-fill me-2"></i> Matching Skills ({{ (match_data.matching_skills | length) if match_data.matching_skills else 0 }})
+        </h5>
+        <div class="d-flex flex-wrap gap-1">
+          {% for skill in match_data.matching_skills %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 py-2 px-3">{{ skill }}</span>
+          {% else %}
+            <span class="text-muted small">No exact matching skills detected.</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Missing Skills -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-danger mb-3">
+          <i class="bi bi-x-circle-fill me-2"></i> Missing Skills Required by JD ({{ (match_data.missing_skills | length) if match_data.missing_skills else 0 }})
+        </h5>
+        <div class="d-flex flex-wrap gap-1">
+          {% for skill in match_data.missing_skills %}
+            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-2 px-3">{{ skill }}</span>
+          {% else %}
+            <span class="text-muted small">No major missing skills!</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breakdown Table & Strengths -->
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart-line text-info me-2"></i> Sub-Score Breakdown</h5>
+        <div class="space-y-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">TF-IDF Text Similarity</span>
+            <span class="fw-bold text-light">{{ match_data.text_similarity }}%</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">Skill Match Percentage</span>
+            <span class="fw-bold text-light">{{ match_data.skill_match_pct }}%</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">Keyword Match Percentage</span>
+            <span class="fw-bold text-light">{{ match_data.keyword_match_pct }}%</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">Role & Domain Match Score</span>
+            <span class="fw-bold text-light">{{ match_data.role_analysis.role_match_score if match_data.role_analysis else 50 }}/100</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">Education Requirement Score</span>
+            <span class="fw-bold text-light">{{ match_data.education_match.score if match_data.education_match else 70 }}/100</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Experience Level Match Score</span>
+            <span class="fw-bold text-light">{{ match_data.experience_match.score if match_data.experience_match else 60 }}/100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i> Key Takeaways & Strengths</h5>
+        <ul class="list-unstyled space-y-2">
+          {% for str in match_data.strengths %}
+            <li class="p-2 glass-card rounded-3 mb-2 border-0 bg-success bg-opacity-10 text-light small">
+              ✓ {{ str }}
+            </li>
+          {% else %}
+            <li class="text-muted small">No specific alignment strengths identified.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

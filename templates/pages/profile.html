@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="glass-card p-4 p-sm-5">
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fs-2" style="width:60px; height:60px;">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div>
+            <h3 class="fw-bold mb-0">{{ current_user.name }}</h3>
+            <span class="badge bg-primary text-uppercase" style="font-size:0.75rem;">{{ current_user.get_plan() }} Plan</span>
+          </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.profile') }}">
+          {{ form.hidden_tag() }}
+
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Full Name</label>
+            {{ form.name(class="form-control") }}
+            {% if form.name.errors %}
+              <div class="text-danger small mt-1">{{ form.name.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Email Address (Read-only)</label>
+            <input type="email" class="form-control" value="{{ current_user.email }}" disabled readonly>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Phone Number</label>
+            {{ form.phone(class="form-control", placeholder="+91 9876543210") }}
+            {% if form.phone.errors %}
+              <div class="text-danger small mt-1">{{ form.phone.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label text-muted small fw-semibold">Location</label>
+            {{ form.location(class="form-control", placeholder="Mumbai, India") }}
+            {% if form.location.errors %}
+              <div class="text-danger small mt-1">{{ form.location.errors[0] }}</div>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="btn btn-gradient w-100 py-3 fw-bold">
+            Save Profile Changes <i class="bi bi-check-circle ms-1"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

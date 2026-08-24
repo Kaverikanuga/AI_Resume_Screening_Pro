@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Welcome Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+    <div>
+      <h2 class="fw-extrabold mb-1">
+        Welcome back, <span style="background: var(--gradient-main); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ current_user.name }}</span>!
+      </h2>
+      <p class="text-light text-opacity-90 mb-0 small">Here is your resume intelligence and ATS performance overview.</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('scanner.upload') }}" class="btn btn-gradient">
+        <i class="bi bi-cloud-upload me-1"></i> Scan Resume
+      </a>
+      <a href="{{ url_for('scanner.job_match') }}" class="btn btn-outline-glass">
+        <i class="bi bi-briefcase me-1"></i> Job Match
+      </a>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6">
+      <div class="glass-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-light small fw-semibold">Resumes Uploaded</span>
+          <i class="bi bi-file-earmark-pdf text-primary fs-4"></i>
+        </div>
+        <h3 class="fw-bold mb-0 text-white">{{ total_resumes }}</h3>
+        <span class="text-light text-opacity-75 small">Active resumes in system</span>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="glass-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-light small fw-semibold">Average ATS Score</span>
+          <i class="bi bi-speedometer text-warning fs-4"></i>
+        </div>
+        <h3 class="fw-bold mb-0 text-warning">{{ avg_ats }}<span class="fs-6 text-light text-opacity-75">/100</span></h3>
+        <span class="text-light text-opacity-75 small">Based on {{ total_resumes }} scan(s)</span>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="glass-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-light small fw-semibold">Job Matches Run</span>
+          <i class="bi bi-crosshair text-info fs-4"></i>
+        </div>
+        <h3 class="fw-bold mb-0 text-info">{{ total_job_matches }}</h3>
+        <span class="text-light text-opacity-75 small">Average match: {{ avg_job_match }}%</span>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="glass-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-light small fw-semibold">Current Plan</span>
+          <i class="bi bi-gem text-success fs-4"></i>
+        </div>
+        <h3 class="fw-bold mb-0 text-success text-uppercase">{{ plan }}</h3>
+        <a href="{{ url_for('main.pricing') }}" class="text-primary small fw-semibold">Upgrade plan →</a>
+      </div>
+    </div>
+  </div>
+
+  {% if latest_resume %}
+    <!-- Latest Resume Analytics Section -->
+    <div class="row g-4 mb-4">
+      <!-- ATS Score Breakdown Card -->
+      <div class="col-lg-5">
+        <div class="glass-card h-100 p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill text-primary me-2"></i> Latest ATS Score</h5>
+            <a href="{{ url_for('scanner.analysis', resume_id=latest_resume.id) }}" class="btn btn-sm btn-outline-glass">View Details</a>
+          </div>
+
+          <div class="text-center my-3">
+            <div class="score-circle-wrap">
+              <svg class="score-circle-svg" viewBox="0 0 100 100">
+                <circle class="score-circle-bg" cx="50" cy="50" r="40" />
+                <circle class="score-circle-val" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="{{ 251.2 - (251.2 * (latest_resume.ats_score or 0) / 100) }}" />
+              </svg>
+              <div class="score-number">{{ latest_resume.ats_score or 0 }}<span class="fs-6 text-light text-opacity-75">%</span></div>
+            </div>
+            <p class="text-light text-opacity-90 small mt-2">Active: <strong class="text-white">{{ latest_resume.original_filename }}</strong></p>
+          </div>
+
+          <!-- Chart canvas for component scores -->
+          <div style="height: 200px;" class="mt-3">
+            <canvas id="atsComponentChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Cards & Analysis Summary -->
+      <div class="col-lg-7">
+        <div class="glass-card h-100 p-4">
+          <h5 class="fw-bold mb-3"><i class="bi bi-stars text-warning me-2"></i> Resume Health & Optimization Tools</h5>
+
+          <div class="row g-2 mb-4">
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.job_match', resume_id=latest_resume.id) }}" class="btn btn-outline-glass w-100 p-3 text-start">
+                <i class="bi bi-briefcase text-primary fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">Job Match</strong>
+                <small class="text-light text-opacity-75">Match with JD</small>
+              </a>
+            </div>
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.linkedin', resume_id=latest_resume.id) }}" class="btn btn-outline-glass w-100 p-3 text-start">
+                <i class="bi bi-linkedin text-info fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">LinkedIn</strong>
+                <small class="text-light text-opacity-75">Profile Optimizer</small>
+              </a>
+            </div>
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.naukri', resume_id=latest_resume.id) }}" class="btn btn-outline-glass w-100 p-3 text-start">
+                <i class="bi bi-building text-warning fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">Naukri</strong>
+                <small class="text-light text-opacity-75">Search Ranking</small>
+              </a>
+            </div>
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.career', resume_id=latest_resume.id) }}" class="btn btn-outline-glass w-100 p-3 text-start">
+                <i class="bi bi-compass text-success fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">Career AI</strong>
+                <small class="text-light text-opacity-75">Roadmap & Prep</small>
+              </a>
+            </div>
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.resume_editor', resume_id=latest_resume.id) }}" class="btn btn-outline-glass w-100 p-3 text-start">
+                <i class="bi bi-pencil-square text-secondary fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">Edit Resume</strong>
+                <small class="text-light text-opacity-75">Modify & Rescore</small>
+              </a>
+            </div>
+            <div class="col-6 col-sm-4">
+              <a href="{{ url_for('scanner.download_report', resume_id=latest_resume.id) }}" class="btn btn-gradient w-100 p-3 text-start">
+                <i class="bi bi-file-earmark-pdf fs-3 d-block mb-1"></i>
+                <strong class="d-block text-white" style="font-size:0.9rem;">PDF Report</strong>
+                <small class="text-white">Download</small>
+              </a>
+            </div>
+          </div>
+
+          <!-- Detected Technical Skills badges -->
+          <div class="pt-2 border-top border-secondary border-opacity-25">
+            <h6 class="text-light small fw-semibold mb-2">Top Detected Skills:</h6>
+            <div class="d-flex flex-wrap gap-1">
+              {% for skill in (latest_extracted.get('skills', {}).get('technical', []))[:12] %}
+                <span class="badge bg-dark border border-secondary text-light">{{ skill }}</span>
+              {% else %}
+                <span class="text-light text-opacity-75 small">No technical skills detected yet.</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <!-- Empty State -->
+    <div class="glass-card glass-card-glow text-center p-5 my-4">
+      <i class="bi bi-cloud-arrow-up display-2 text-primary mb-3"></i>
+      <h3 class="fw-bold text-white">No Resumes Scanned Yet</h3>
+      <p class="text-light text-opacity-90 mb-4">Upload your PDF resume to unlock ATS scoring, keyword optimization, and AI job matching.</p>
+      <a href="{{ url_for('scanner.upload') }}" class="btn btn-gradient btn-lg px-4">
+        Upload PDF Resume Now <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+  {% endif %}
+
+  <!-- PROMINENT AI SCREENING RESULT & REJECTION ANALYSIS SECTION -->
+  {% if latest_job_match and latest_rejection %}
+    <div class="glass-card glass-card-glow p-4 mb-4 border-{{ 'success' if latest_job_match.decision == 'RECOMMENDED' else 'danger' }} border-opacity-50">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <h5 class="fw-bold mb-0 text-white">
+          <i class="bi bi-cpu-fill text-warning me-2"></i> AI Screening Result & Rejection Analysis
+        </h5>
+        <span class="badge bg-secondary bg-opacity-25 text-light small px-3 py-1">
+          Resume: <strong>{{ latest_resume.original_filename }}</strong> | Job: <strong>{{ latest_job_match.job_title }}</strong>
+        </span>
+        <a href="{{ url_for('scanner.analysis', resume_id=latest_resume.id) }}" class="btn btn-sm btn-outline-glass">Open this analysis</a>
+      </div>
+
+      <div class="row align-items-center g-4">
+        <div class="col-lg-4 text-center border-end border-secondary border-opacity-25 pe-lg-4">
+          {% if latest_job_match.decision == 'RECOMMENDED' %}
+            <div class="badge bg-success fs-5 py-2 px-3 mb-3 text-wrap">
+              <i class="bi bi-check-circle-fill me-1"></i> ACCEPTED / RECOMMENDED
+            </div>
+            <div class="display-5 fw-extrabold text-success mb-1">{{ latest_job_match.match_percentage }}%</div>
+            <p class="text-light text-opacity-90 small mb-0">Overall Match Score | ATS: {{ latest_resume.ats_score or 0 }}/100</p>
+          {% else %}
+            <div class="badge bg-danger fs-5 py-2 px-3 mb-3 text-wrap">
+              <i class="bi bi-x-octagon-fill me-1"></i> REJECTED / NOT RECOMMENDED
+            </div>
+            <div class="display-5 fw-extrabold text-danger mb-1">{{ latest_job_match.match_percentage }}%</div>
+            <p class="text-light text-opacity-90 small mb-2">Overall Match Score | ATS: {{ latest_resume.ats_score or 0 }}/100</p>
+
+            <div class="p-2 glass-card rounded-3 bg-primary bg-opacity-10 border-primary border-opacity-25 my-2">
+              <span class="text-light small d-block">Estimated Improved Score:</span>
+              <strong class="text-success fs-5">{{ latest_rejection.match_percentage }}% → {{ latest_rejection.estimated_improved_match }}%</strong>
+              <span class="badge bg-success ms-1">+{{ latest_rejection.improvement_delta }}%</span>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="col-lg-8">
+          {% if latest_job_match.decision == 'RECOMMENDED' %}
+            <div class="p-3 glass-card rounded-3 bg-success bg-opacity-10 border-success border-opacity-25 mb-3">
+              <h6 class="fw-bold text-success mb-1">✓ Application Recommended</h6>
+              <p class="text-light small mb-0">Your resume strongly aligns with the qualifications, skills, and experience requested for {{ latest_job_match.job_title }}.</p>
+            </div>
+          {% else %}
+            <!-- Rejection Primary Reason -->
+            <div class="p-3 glass-card rounded-3 bg-danger bg-opacity-10 border-danger border-opacity-25 mb-3">
+              <h6 class="fw-bold text-danger mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Primary AI Rejection Reason:</h6>
+              <p class="text-light small mb-0">→ {{ latest_rejection.primary_reason }}</p>
+            </div>
+
+            <!-- Missing Skills & Keywords -->
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <strong class="text-light small d-block mb-1">Missing Required Skills:</strong>
+                <div class="d-flex flex-wrap gap-1">
+                  {% for skill in latest_rejection.missing_skills[:6] %}
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25">{{ skill }}</span>
+                  {% else %}
+                    <span class="text-light text-opacity-75 small">None detected</span>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <strong class="text-light small d-block mb-1">Missing JD Keywords:</strong>
+                <div class="d-flex flex-wrap gap-1">
+                  {% for kw in latest_rejection.missing_keywords[:6] %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25">{{ kw }}</span>
+                  {% else %}
+                    <span class="text-light text-opacity-75 small">None detected</span>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Recommendations -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 border-top border-secondary border-opacity-25 pt-3">
+              <small class="text-light">Top Action: <strong class="text-white">{{ (latest_rejection.improvements | first) if latest_rejection.improvements else 'Incorporate missing skills into work history.' }}</strong></small>
+              <a href="{{ url_for('scanner.rejection_analysis', job_match_id=latest_job_match.id) }}" class="btn btn-sm btn-gradient">
+                View Full AI Rejection Analysis <i class="bi bi-arrow-right ms-1"></i>
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Recent Job Matches History Table -->
+  {% if recent_job_matches %}
+    <div class="glass-card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-info me-2"></i> Recent Job Match Scans</h5>
+        <a href="{{ url_for('main.history') }}" class="small text-primary">View All History →</a>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-custom">
+          <thead>
+            <tr>
+              <th>Job Title</th>
+              <th>Company</th>
+              <th>Overall Match</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for match in recent_job_matches %}
+            <tr>
+              <td><strong class="text-white">{{ match.job_title }}</strong></td>
+              <td class="text-light">{{ match.company or 'N/A' }}</td>
+              <td>
+                <span class="fw-bold text-{{ 'success' if match.match_percentage >= 70 else ('warning' if match.match_percentage >= 50 else 'danger') }}">
+                  {{ match.match_percentage }}%
+                </span>
+              </td>
+              <td>
+                {% if match.decision == 'RECOMMENDED' %}
+                  <span class="badge badge-success">✓ ACCEPTED / RECOMMENDED</span>
+                {% elif match.decision == 'CONDITIONALLY_RECOMMENDED' %}
+                  <span class="badge badge-warning">⚠ CONDITIONALLY RECOMMENDED</span>
+                {% else %}
+                  <span class="badge badge-danger">❌ REJECTED / NOT RECOMMENDED</span>
+                {% endif %}
+              </td>
+              <td class="text-light text-opacity-75 small">{{ match.created_at.strftime('%b %d, %Y') }}</td>
+                <td>
+                  <a href="{{ url_for('scanner.job_match_result', job_match_id=match.id) }}" class="btn btn-sm btn-outline-glass me-1">Result</a>
+                  {% if match.decision != 'RECOMMENDED' %}
+                    <a href="{{ url_for('scanner.rejection_analysis', job_match_id=match.id) }}" class="btn btn-sm btn-gradient py-1 px-2" style="font-size:0.75rem;">
+                      <i class="bi bi-search me-1"></i> Rejection Analyzer
+                    </a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if latest_resume and latest_ats_data %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('atsComponentChart').getContext('2d');
+    const compScores = {{ latest_ats_data.get('component_scores', {}) | tojson }};
+
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(compScores),
+        datasets: [{
+          label: 'Score (%)',
+          data: Object.values(compScores),
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.7)',
+            'rgba(139, 92, 246, 0.7)',
+            'rgba(6, 182, 212, 0.7)',
+            'rgba(16, 185, 129, 0.7)',
+            'rgba(245, 158, 11, 0.7)',
+            'rgba(244, 63, 94, 0.7)',
+            'rgba(99, 102, 241, 0.7)'
+          ],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { color: '#cbd5e1', font: { weight: '600' } },
+            grid: { color: 'rgba(255, 255, 255, 0.08)' }
+          },
+          x: {
+            ticks: { color: '#cbd5e1', font: { weight: '600' } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Us - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center g-4">
+        <!-- Info Column -->
+        <div class="col-lg-5">
+            <div class="glass-card glass-card-glow p-4 p-sm-5 h-100">
+                <div class="badge badge-info mb-2 py-1 px-3">GET IN TOUCH</div>
+                <h2 class="fw-bold mb-3">We'd Love to Hear From You</h2>
+                <p class="text-muted mb-4">Questions about plans, billing, features, or your analysis results? Send us a
+                    message and our team will respond within 1–2 business days.</p>
+
+                <div class="d-flex align-items-start gap-3 mb-3">
+                    <i class="bi bi-envelope-fill text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block text-white small">Email Support</strong>
+                        <span class="text-muted small">support@airesumescreen.com</span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3 mb-3">
+                    <i class="bi bi-clock-fill text-info fs-4"></i>
+                    <div>
+                        <strong class="d-block text-white small">Response Time</strong>
+                        <span class="text-muted small">Monday – Saturday, 9 AM – 7 PM IST</span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3">
+                    <i class="bi bi-shield-check text-success fs-4"></i>
+                    <div>
+                        <strong class="d-block text-white small">Privacy First</strong>
+                        <span class="text-muted small">Your resumes and messages are never shared with third
+                            parties.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Column -->
+        <div class="col-lg-7">
+            <div class="glass-card p-4 p-sm-5 h-100">
+                <h4 class="fw-bold mb-4"><i class="bi bi-chat-dots me-2 text-primary"></i> Send a Message</h4>
+
+                <form method="POST" action="{{ url_for('main.contact') }}">
+                    {{ form.hidden_tag() }}
+
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <label class="form-label text-muted small fw-semibold">Your Name *</label>
+                            {{ form.name(class="form-control", placeholder="John Doe") }}
+                            {% if form.name.errors %}
+                            <div class="text-danger small mt-1">{{ form.name.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Email Address *</label>
+                            {{ form.email(class="form-control", placeholder="name@example.com") }}
+                            {% if form.email.errors %}
+                            <div class="text-danger small mt-1">{{ form.email.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Subject (Optional)</label>
+                        {{ form.subject(class="form-control", placeholder="e.g. Billing question about PRO plan") }}
+                        {% if form.subject.errors %}
+                        <div class="text-danger small mt-1">{{ form.subject.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-semibold">Message *</label>
+                        {{ form.message(class="form-control", rows=6, placeholder="Tell us how we can help...") }}
+                        {% if form.message.errors %}
+                        <div class="text-danger small mt-1">{{ form.message.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <button type="submit" class="btn btn-gradient w-100 py-3 fw-bold">
+                        Send Message <i class="bi bi-send ms-1"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Resume Preview - {{ data.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <div class="badge badge-info mb-1 py-1 px-3">RESUME BUILDER PREVIEW</div>
+      <h2 class="fw-bold mb-0">Live Resume Preview</h2>
+      <p class="text-muted small mb-0">Selected Template Style: <strong class="text-uppercase text-primary">{{ data.template }}</strong></p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button onclick="window.print()" class="btn btn-gradient">
+        <i class="bi bi-printer me-1"></i> Print / Save PDF
+      </button>
+      <a href="{{ url_for('scanner.resume_builder') }}" class="btn btn-outline-glass">
+        <i class="bi bi-pencil me-1"></i> Edit Builder Fields
+      </a>
+    </div>
+  </div>
+
+  <!-- Template Card Container with Template-Specific Styling -->
+  <div class="resume-paper glass-card p-5 bg-white text-dark mx-auto shadow-lg rounded-3 template-preview-{{ data.template }}" style="max-width: 800px;">
+    {% if data.template == 'modern' %}
+      <!-- Modern Template -->
+      <div class="border-bottom border-primary border-3 pb-3 mb-4">
+        <h1 class="fw-extrabold mb-1 text-primary" style="font-size: 2.3rem;">{{ data.full_name }}</h1>
+        <p class="mb-1 text-secondary small">
+          <i class="bi bi-envelope me-1"></i> {{ data.email }} | <i class="bi bi-telephone me-1"></i> {{ data.phone }} | <i class="bi bi-geo-alt me-1"></i> {{ data.location }}
+        </p>
+        {% if data.linkedin or data.github %}
+          <p class="mb-0 text-secondary small">
+            {% if data.linkedin %}<i class="bi bi-linkedin me-1"></i> {{ data.linkedin }} {% endif %}
+            {% if data.github %} | <i class="bi bi-github me-1"></i> {{ data.github }}{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    {% elif data.template == 'professional' %}
+      <!-- Professional Template -->
+      <div class="text-center border-bottom border-purple border-2 pb-3 mb-4" style="border-color: #8b5cf6 !important;">
+        <h1 class="fw-bold mb-1 text-dark" style="font-family: Georgia, serif; font-size: 2.4rem;">{{ data.full_name }}</h1>
+        <p class="mb-1 text-muted small text-uppercase" style="letter-spacing: 2px;">
+          {{ data.email }} &bull; {{ data.phone }} &bull; {{ data.location }}
+        </p>
+        {% if data.linkedin or data.github %}
+          <p class="mb-0 text-muted small">
+            {% if data.linkedin %}{{ data.linkedin }}{% endif %}
+            {% if data.github %} &bull; {{ data.github }}{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    {% elif data.template == 'minimal' %}
+      <!-- Minimal Template -->
+      <div class="mb-4">
+        <h1 class="fw-bold mb-1 text-dark" style="font-size: 2rem;">{{ data.full_name }}</h1>
+        <p class="mb-0 text-muted small">
+          {{ data.email }} / {{ data.phone }} / {{ data.location }}
+          {% if data.linkedin %} / {{ data.linkedin }}{% endif %}
+          {% if data.github %} / {{ data.github }}{% endif %}
+        </p>
+      </div>
+    {% else %}
+      <!-- ATS-Friendly Standard Template -->
+      <div class="text-center border-bottom pb-3 mb-4">
+        <h1 class="fw-bold mb-1 text-dark" style="font-size: 2.1rem; font-family: Arial, sans-serif;">{{ data.full_name }}</h1>
+        <p class="mb-1 text-secondary small">
+          {{ data.email }} | {{ data.phone }} | {{ data.location }}
+        </p>
+        {% if data.linkedin or data.github %}
+          <p class="mb-0 text-secondary small">
+            {% if data.linkedin %}{{ data.linkedin }} {% endif %}
+            {% if data.github %} | {{ data.github }}{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <!-- Professional Summary -->
+    {% if data.summary %}
+      <div class="mb-4">
+        <h5 class="fw-bold text-uppercase border-bottom pb-1 text-dark" style="font-size: 0.95rem; letter-spacing: 1px;">Professional Summary</h5>
+        <p class="small text-secondary" style="line-height: 1.6;">{{ data.summary }}</p>
+      </div>
+    {% endif %}
+
+    <!-- Skills -->
+    {% if data.skills %}
+      <div class="mb-4">
+        <h5 class="fw-bold text-uppercase border-bottom pb-1 text-dark" style="font-size: 0.95rem; letter-spacing: 1px;">Core Competencies & Technical Skills</h5>
+        <p class="small text-secondary mb-0">{{ data.skills | join(' • ') }}</p>
+      </div>
+    {% endif %}
+
+    <!-- Work Experience -->
+    <div class="mb-4">
+      <h5 class="fw-bold text-uppercase border-bottom pb-1 text-dark" style="font-size: 0.95rem; letter-spacing: 1px;">Professional Experience</h5>
+      <div class="mb-2">
+        <div class="d-flex justify-content-between font-weight-bold">
+          <strong class="text-dark">Software Engineer / Technical Specialist</strong>
+          <span class="text-secondary small">2023 – Present</span>
+        </div>
+        <ul class="small text-secondary ps-3 mt-1">
+          <li>Architected scalable software solutions and reduced system response latency by 35%.</li>
+          <li>Led team code reviews, automated CI/CD pipelines, and ensured 99.9% application uptime.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Education -->
+    <div>
+      <h5 class="fw-bold text-uppercase border-bottom pb-1 text-dark" style="font-size: 0.95rem; letter-spacing: 1px;">Education & Qualifications</h5>
+      <div class="d-flex justify-content-between">
+        <strong class="text-dark">Bachelor of Technology / Relevant Degree</strong>
+        <span class="text-secondary small">2019 – 2023</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

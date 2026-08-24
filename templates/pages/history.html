@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Resume & Match History - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1">Resume & Match History</h2>
+      <p class="text-muted mb-0 small">View all your previous PDF scans, ATS scores, and job match evaluations.</p>
+    </div>
+    <a href="{{ url_for('scanner.upload') }}" class="btn btn-gradient">
+      <i class="bi bi-cloud-upload me-1"></i> Scan New Resume
+    </a>
+  </div>
+
+  <!-- Resumes List Card -->
+  <div class="glass-card p-4 mb-4">
+    <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i> Scanned PDF Resumes</h5>
+    {% if resumes %}
+    <div class="table-responsive">
+      <table class="table table-custom">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Upload Date</th>
+            <th>ATS Score</th>
+            <th>Keywords Score</th>
+            <th>Formatting Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in resumes %}
+          <tr>
+            <td><strong>{{ r.original_filename }}</strong></td>
+            <td class="text-muted small">{{ r.upload_date.strftime('%b %d, %Y %H:%M') }}</td>
+            <td>
+              <span
+                class="fw-bold text-{{ 'success' if (r.ats_score or 0) >= 75 else ('warning' if (r.ats_score or 0) >= 50 else 'danger') }}">
+                {{ r.ats_score or 0 }}/100
+              </span>
+            </td>
+            <td>{{ r.keyword_score or 0 }}/100</td>
+            <td>{{ r.formatting_score or 0 }}/100</td>
+            <td>
+              <a href="{{ url_for('scanner.analysis', resume_id=r.id) }}"
+                class="btn btn-sm btn-outline-glass me-1">Analysis</a>
+              <a href="{{ url_for('scanner.job_match', resume_id=r.id) }}"
+                class="btn btn-sm btn-outline-glass me-1">Match JD</a>
+              <a href="{{ url_for('scanner.download_report', resume_id=r.id) }}"
+                class="btn btn-sm btn-gradient me-1">PDF Report</a>
+              <form method="POST" action="{{ url_for('scanner.delete_resume', resume_id=r.id) }}" class="d-inline"
+                onsubmit="return confirm('Remove this resume from your account? Its analysis history will be hidden.');">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Remove resume">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No resumes uploaded yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Job Matches Table -->
+  <div class="glass-card p-4">
+    <h5 class="fw-bold mb-3"><i class="bi bi-briefcase-fill text-info me-2"></i> Job Description Match Evaluations</h5>
+    {% if matches %}
+    <div class="table-responsive">
+      <table class="table table-custom">
+        <thead>
+          <tr>
+            <th>Job Title</th>
+            <th>Company</th>
+            <th>Match %</th>
+            <th>Decision</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in matches %}
+          <tr>
+            <td><strong>{{ m.job_title }}</strong></td>
+            <td>{{ m.company or 'N/A' }}</td>
+            <td>
+              <span
+                class="fw-bold text-{{ 'success' if m.match_percentage >= 70 else ('warning' if m.match_percentage >= 50 else 'danger') }}">
+                {{ m.match_percentage }}%
+              </span>
+            </td>
+            <td>
+              {% if m.decision == 'RECOMMENDED' %}
+              <span class="badge badge-success">✓ RECOMMENDED</span>
+              {% elif m.decision == 'CONDITIONALLY_RECOMMENDED' %}
+              <span class="badge badge-warning">⚠ CONDITIONALLY RECOMMENDED</span>
+              {% else %}
+              <span class="badge badge-danger">❌ NOT RECOMMENDED</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ m.created_at.strftime('%b %d, %Y') }}</td>
+            <td>
+              <a href="{{ url_for('scanner.job_match_result', job_match_id=m.id) }}"
+                class="btn btn-sm btn-outline-glass me-1">View Result</a>
+              {% if m.decision != 'RECOMMENDED' %}
+              <a href="{{ url_for('scanner.rejection_analysis', job_match_id=m.id) }}"
+                class="btn btn-sm btn-gradient py-1 px-2" style="font-size:0.75rem;">
+                Rejection Reasons
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No job matches run yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

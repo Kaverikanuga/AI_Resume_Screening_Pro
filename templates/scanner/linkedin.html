@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}LinkedIn Optimization - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <div class="badge badge-info mb-1 py-1 px-3">LINKEDIN PROFILE OPTIMIZATION</div>
+      <h2 class="fw-extrabold mb-0">LinkedIn Profile Intelligence</h2>
+      <p class="text-muted small mb-0">Optimization recommendations based on resume data for candidate: {{
+        resume.original_filename }}</p>
+    </div>
+
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-glass">
+      <i class="bi bi-arrow-left me-1"></i> Dashboard
+    </a>
+  </div>
+
+  <!-- Profile Completeness Score Card -->
+  <div class="glass-card glass-card-glow p-4 mb-4">
+    <div class="row align-items-center">
+      <div class="col-md-3 text-center mb-3 mb-md-0">
+        <div class="score-circle-wrap">
+          <svg class="score-circle-svg" viewBox="0 0 100 100">
+            <circle class="score-circle-bg" cx="50" cy="50" r="40" />
+            <circle class="score-circle-val" cx="50" cy="50" r="40" stroke-dasharray="251.2"
+              stroke-dashoffset="{{ 251.2 - (251.2 * report.profile_score / 100) }}" />
+          </svg>
+          <div class="score-number">{{ report.profile_score }}<span class="fs-6 text-muted">%</span></div>
+        </div>
+        <div class="mt-2 fw-semibold text-light">LinkedIn Score</div>
+      </div>
+
+      <div class="col-md-9">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <h4 class="fw-bold mb-0">Profile Rating:</h4>
+          <span class="badge bg-primary fs-6 py-1 px-3">{{ report.score_label }}</span>
+        </div>
+        <p class="text-muted mb-3">All-Star LinkedIn profiles get up to 40x more recruiter messages and profile views.
+        </p>
+
+        <!-- Score breakdown badges -->
+        <div class="d-flex flex-wrap gap-2">
+          {% for key, val in report.score_breakdown.items() %}
+          <span class="badge bg-dark border border-secondary text-light">
+            {{ key }}: <strong class="text-primary">+{{ val }} pts</strong>
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <!-- Suggested Headlines -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-fonts me-2"></i> Optimized Headline Ideas</h5>
+        <ul class="list-unstyled space-y-2 mb-0">
+          {% for hl in report.headlines %}
+          <li
+            class="p-3 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small d-flex align-items-center justify-content-between">
+            <span>{{ hl }}</span>
+            <button type="button" class="btn btn-sm btn-outline-glass ms-2 copy-btn" data-copy="{{ hl }}">Copy</button>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Suggested About Section -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-info mb-3"><i class="bi bi-file-text me-2"></i> Suggested "About" Summary</h5>
+        {% for sug in report.about_suggestions %}
+        <div class="p-3 glass-card rounded-3 mb-3 border-0 bg-dark bg-opacity-50">
+          <h6 class="fw-bold text-white mb-2">{{ sug.title }}</h6>
+          <p class="text-muted small mb-2">{{ sug.content }}</p>
+          <button type="button" class="btn btn-sm btn-outline-glass copy-btn" data-copy="{{ sug.content }}">Copy
+            Summary</button>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">Your summary already looks strong — no template needed. Review the tips below
+          to polish it further.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recruiter Visibility & Networking Tips -->
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-warning mb-3"><i class="bi bi-eye-fill me-2"></i> Recruiter Visibility Actions</h5>
+        <div class="space-y-3">
+          {% for tip in report.visibility_tips %}
+          <div class="p-3 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-white small">{{ tip.title }}</strong>
+              <span
+                class="badge bg-{{ 'danger' if tip.priority == 'Critical' else ('warning' if tip.priority == 'High' else 'info') }} py-1 px-2">{{
+                tip.priority }}</span>
+            </div>
+            <p class="text-muted small mb-0">{{ tip.description }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-people-fill me-2"></i> Networking & Engagement Tips</h5>
+        <ul class="list-unstyled space-y-2">
+          {% for net in report.networking_tips %}
+          <li class="p-3 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small">
+            💡 {{ net }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

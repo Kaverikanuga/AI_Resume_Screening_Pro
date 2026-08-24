@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing Plans - AI Resume Screening Pro{% endblock %}
+
+{% block extra_js %}
+<!-- Razorpay Checkout JS (only needed on this page) -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="text-center mb-5">
+    <div class="badge badge-info mb-2 py-1 px-3">TRANSPARENT PRICING</div>
+    <h1 class="fw-extrabold display-5">Flexible Plans For Every Job Seeker</h1>
+    <p class="text-muted fs-5" style="max-width: 600px; margin: 0 auto;">
+      Unlock real ATS algorithms, AI Screening-Based Rejection Analyzer, and recruiter optimization tools.
+    </p>
+  </div>
+
+  <div class="row g-4 align-items-stretch justify-content-center">
+    <!-- FREE PLAN -->
+    <div class="col-lg-4 col-md-6">
+      <div class="glass-card h-100 p-4 p-lg-5 d-flex flex-column">
+        <div class="mb-4">
+          <span class="badge bg-secondary bg-opacity-25 text-light px-3 py-1 rounded-pill mb-2">STARTER</span>
+          <h3 class="fw-bold">FREE</h3>
+          <div class="my-3">
+            <span class="display-4 fw-extrabold">₹0</span>
+            <span class="text-muted">/ forever</span>
+          </div>
+          <p class="text-muted small">Essential resume parsing and basic ATS score to get you started.</p>
+        </div>
+
+        <hr class="border-secondary border-opacity-25 mb-4">
+
+        <ul class="list-unstyled space-y-3 mb-5 flex-grow-1">
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Basic Resume Scan & Extraction
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Basic ATS Score
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Basic Job Description Match
+          </li>
+          <li class="d-flex align-items-center text-muted mb-3 opacity-50">
+            <i class="bi bi-x-circle me-2 fs-5"></i> AI Rejection Analyzer
+          </li>
+          <li class="d-flex align-items-center text-muted mb-3 opacity-50">
+            <i class="bi bi-x-circle me-2 fs-5"></i> LinkedIn & Naukri Optimizers
+          </li>
+          <li class="d-flex align-items-center text-muted mb-3 opacity-50">
+            <i class="bi bi-x-circle me-2 fs-5"></i> Download PDF Reports
+          </li>
+        </ul>
+
+        {% if current_user.is_authenticated and current_plan == 'free' %}
+        <button class="btn btn-outline-glass w-100 py-3 disabled">Current Plan</button>
+        {% elif current_user.is_authenticated %}
+        <button class="btn btn-outline-glass w-100 py-3 disabled">Included</button>
+        {% else %}
+        <a href="{{ url_for('auth.register') }}" class="btn btn-outline-glass w-100 py-3">Get Started Free</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- PRO PLAN -->
+    <div class="col-lg-4 col-md-6">
+      <div class="glass-card glass-card-glow h-100 p-4 p-lg-5 d-flex flex-column position-relative border-primary">
+        <div class="position-absolute top-0 end-0 m-3">
+          <span class="badge badge-success px-3 py-1">MOST POPULAR</span>
+        </div>
+
+        <div class="mb-4">
+          <span class="badge bg-primary bg-opacity-25 text-primary px-3 py-1 rounded-pill mb-2">INDIVIDUAL PRO</span>
+          <h3 class="fw-bold">PRO</h3>
+          <div class="my-3">
+            <span class="display-4 fw-extrabold text-primary">₹59</span>
+            <span class="text-muted">/ month</span>
+          </div>
+          <p class="text-muted small">Complete AI ATS optimization, rejection analyzer, and career assistant tools.</p>
+        </div>
+
+        <hr class="border-secondary border-opacity-25 mb-4">
+
+        <ul class="list-unstyled space-y-3 mb-5 flex-grow-1">
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> <strong>Advanced ATS Analysis</strong>
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> <strong>AI Screening Rejection
+              Analyzer</strong>
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> Advanced Job Matching & Skill Gap
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> Resume Builder & Resume Editor
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> LinkedIn Profile Optimizer
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> Naukri Search Ranking Optimizer
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> Career Assistant & Roadmaps
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-primary me-2 fs-5"></i> Download PDF Reports
+          </li>
+        </ul>
+
+        {% if current_user.is_authenticated and current_plan == 'pro' %}
+        <button class="btn btn-gradient w-100 py-3 disabled">Current Active Plan</button>
+        {% elif current_user.is_authenticated %}
+        <button onclick="initiateRazorpayPayment('pro', '{{ csrf_token() }}', this)"
+          class="btn btn-gradient w-100 py-3 fw-bold">
+          Upgrade to PRO (₹59) <i class="bi bi-lightning-fill ms-1"></i>
+        </button>
+        {% else %}
+        <a href="{{ url_for('auth.register') }}" class="btn btn-gradient w-100 py-3 fw-bold">Sign Up & Upgrade</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- BUSINESS PLAN -->
+    <div class="col-lg-4 col-md-6">
+      <div class="glass-card h-100 p-4 p-lg-5 d-flex flex-column">
+        <div class="mb-4">
+          <span class="badge bg-warning bg-opacity-25 text-warning px-3 py-1 rounded-pill mb-2">RECRUITER & TEAMS</span>
+          <h3 class="fw-bold">BUSINESS</h3>
+          <div class="my-3">
+            <span class="display-4 fw-extrabold text-warning">₹99</span>
+            <span class="text-muted">/ month</span>
+          </div>
+          <p class="text-muted small">Everything in PRO with priority support — plus team-scale recruiting tools on the
+            way.</p>
+        </div>
+
+        <hr class="border-secondary border-opacity-25 mb-4">
+
+        <ul class="list-unstyled space-y-3 mb-5 flex-grow-1">
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-warning me-2 fs-5"></i> <strong>Everything in PRO Plan</strong>
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-warning me-2 fs-5"></i> Unlimited Everything, Longer Retention
+          </li>
+          <li class="d-flex align-items-center mb-3">
+            <i class="bi bi-check-circle-fill text-warning me-2 fs-5"></i> Priority Support & Onboarding
+          </li>
+          <li class="d-flex align-items-center mb-3 opacity-75">
+            <i class="bi bi-hourglass-split text-warning me-2 fs-5"></i> Bulk Resume Screening
+            <span class="badge bg-secondary ms-2" style="font-size:0.6rem;">COMING SOON</span>
+          </li>
+          <li class="d-flex align-items-center mb-3 opacity-75">
+            <i class="bi bi-hourglass-split text-warning me-2 fs-5"></i> Candidate Ranking & Comparison
+            <span class="badge bg-secondary ms-2" style="font-size:0.6rem;">COMING SOON</span>
+          </li>
+          <li class="d-flex align-items-center mb-3 opacity-75">
+            <i class="bi bi-hourglass-split text-warning me-2 fs-5"></i> Recruiter Analytics Dashboard
+            <span class="badge bg-secondary ms-2" style="font-size:0.6rem;">COMING SOON</span>
+          </li>
+        </ul>
+
+        {% if current_user.is_authenticated and current_plan == 'business' %}
+        <button class="btn btn-outline-glass w-100 py-3 disabled">Current Active Plan</button>
+        {% elif current_user.is_authenticated %}
+        <button onclick="initiateRazorpayPayment('business', '{{ csrf_token() }}', this)"
+          class="btn btn-gradient w-100 py-3 fw-bold">
+          Get Business (₹99) <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+        {% else %}
+        <a href="{{ url_for('auth.register') }}" class="btn btn-gradient w-100 py-3 fw-bold">Sign Up & Upgrade</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

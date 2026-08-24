@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}AI Career Assistant - {{ career.target_role }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <div class="badge badge-info mb-1 py-1 px-3">AI CAREER ASSISTANT & ROADMAP</div>
+      <h2 class="fw-extrabold mb-0">Career Guidance for <span class="text-primary">{{ career.target_role }}</span></h2>
+      <p class="text-muted small mb-0">Estimated Job Readiness Preparation Time: <strong>{{ career.estimated_prep_time }}</strong></p>
+    </div>
+
+    <!-- Role Form -->
+    <form method="POST" action="{{ url_for('scanner.career', resume_id=resume.id) }}" class="d-flex gap-2">
+      {{ form.hidden_tag() }}
+      {{ form.target_role(class="form-control form-control-sm", placeholder="e.g. Data Scientist / Software Engineer") }}
+      <button type="submit" class="btn btn-sm btn-gradient text-nowrap">Update Role</button>
+    </form>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <!-- Top Skills To Learn -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-lightbulb-fill me-2"></i> Recommended Skills To Learn</h5>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% for skill in career.skills_to_learn %}
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-2 px-3 fs-6">+ {{ skill }}</span>
+          {% else %}
+            <span class="text-muted small">You already have most core skills for this role!</span>
+          {% endfor %}
+        </div>
+
+        <h6 class="fw-bold text-muted small text-uppercase mt-4 mb-2">Recommended Certifications</h6>
+        <ul class="list-unstyled space-y-2 mb-0">
+          {% for cert in career.certifications %}
+            <li class="p-2 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small">
+              🏆 {{ cert }}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Project Ideas -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-info mb-3"><i class="bi bi-code-square me-2"></i> High-Impact Portfolio Project Ideas</h5>
+        <ul class="list-unstyled space-y-2 mb-0">
+          {% for proj in career.project_ideas %}
+            <li class="p-3 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small">
+              🚀 <strong>{{ proj }}</strong>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Career Roadmap Timeline -->
+  <div class="glass-card p-4 mb-4">
+    <h5 class="fw-bold text-warning mb-4"><i class="bi bi-compass-fill me-2"></i> Structured Career Roadmap</h5>
+    <div class="row g-4">
+      {% for phase in career.roadmap %}
+        <div class="col-md-4">
+          <div class="p-4 glass-card h-100 border-primary border-opacity-25" style="background: rgba(15, 23, 42, 0.6);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-primary py-1 px-3">Phase {{ loop.index }}</span>
+              <span class="text-muted small"><i class="bi bi-clock me-1"></i> {{ phase.duration }}</span>
+            </div>
+            <h5 class="fw-bold text-white mb-3">{{ phase.phase }}</h5>
+            <ul class="list-unstyled space-y-2 mb-0">
+              {% for task in phase.tasks %}
+                <li class="text-muted small mb-2">✓ {{ task }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Interview Questions -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-question-circle-fill me-2"></i> Core Technical & Behavioral Interview Questions</h5>
+        <ol class="space-y-2 mb-0 ps-3">
+          {% for q in career.interview_questions %}
+            <li class="text-light small mb-2">{{ q }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+
+    <!-- Placement Preparation Tips & Resources -->
+    <div class="col-md-6">
+      <div class="glass-card h-100 p-4">
+        <h5 class="fw-bold text-purple me-2 mb-3"><i class="bi bi-book-fill text-purple me-2"></i> Recommended Learning Resources</h5>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          {% for res in career.learning_resources %}
+            <a href="{{ res.url }}" target="_blank" class="btn btn-sm btn-outline-glass">
+              {{ res.name }} <span class="badge bg-secondary ms-1">{{ res.type }}</span>
+            </a>
+          {% endfor %}
+        </div>
+
+        <h6 class="fw-bold text-muted small text-uppercase mb-2">Placement Preparation Checklist</h6>
+        <ul class="list-unstyled space-y-2 mb-0">
+          {% for tip in career.placement_tips %}
+            <li class="p-2 glass-card rounded-3 mb-2 border-0 bg-dark bg-opacity-50 text-light small">
+              📌 {{ tip }}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

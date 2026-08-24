@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}403 Forbidden - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+  <div class="glass-card glass-card-glow my-5 p-5 mx-auto" style="max-width: 550px;">
+    <div class="display-1 fw-extrabold text-warning mb-3">403</div>
+    <h2 class="fw-bold mb-3">Access Forbidden</h2>
+    <p class="text-muted mb-4">You do not have permission to access this resource or feature.</p>
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-gradient px-4 py-2">
+      <i class="bi bi-house-door me-2"></i> Return to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}

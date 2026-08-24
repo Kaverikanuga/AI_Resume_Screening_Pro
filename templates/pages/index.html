@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}AI Resume Screening Pro - Transform Your Resume Into a Job Magnet{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="py-5 my-4">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <!-- Left Column: Hero Copy -->
+      <div class="col-lg-6">
+        <div class="badge badge-info mb-3 py-2 px-3 fs-6">
+          <i class="bi bi-stars text-warning me-1"></i> AI-POWERED ATS OPTIMIZATION
+        </div>
+
+        <h1 class="display-4 fw-extrabold mb-3" style="line-height: 1.15;">
+          Transform Your Resume<br>
+          <span
+            style="background: var(--gradient-main); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Into
+            a Job Magnet</span>
+        </h1>
+
+        <p class="lead text-light text-opacity-90 mb-4 fs-5" style="max-width: 520px;">
+          Analyze, optimize, and perfect your resume with real ATS scoring, job matching, and actionable AI career
+          insights.
+        </p>
+
+        <div class="d-flex flex-wrap gap-3 mb-5">
+          <a href="{{ url_for('auth.register') }}" class="btn btn-gradient btn-lg px-4 py-3">
+            Get Started Free <i class="bi bi-arrow-right ms-2"></i>
+          </a>
+          <a href="{{ url_for('auth.login') }}" class="btn btn-outline-glass btn-lg px-4 py-3">
+            Sign In <i class="bi bi-box-arrow-in-right ms-2"></i>
+          </a>
+        </div>
+
+        <!-- Metric Badges -->
+        <div class="row text-center g-3 pt-3 border-top border-secondary border-opacity-25">
+          <div class="col-4">
+            <h3 class="fw-bold text-white mb-0">150,000+</h3>
+            <span class="text-light text-opacity-75 small">Resumes Analyzed</span>
+          </div>
+          <div class="col-4">
+            <h3 class="fw-bold text-white mb-0">98%</h3>
+            <span class="text-light text-opacity-75 small">% Satisfaction</span>
+          </div>
+          <div class="col-4">
+            <h3 class="fw-bold text-white mb-0">45,000+</h3>
+            <span class="text-light text-opacity-75 small">Jobs Matched</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: ATS Score Preview Card -->
+      <div class="col-lg-6">
+        <div class="glass-card glass-card-glow p-4 position-relative">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold mb-0"><i class="bi bi-shield-check text-primary me-2"></i> Real-time ATS Analytics</h5>
+            <span class="badge badge-success"><i class="bi bi-check-circle-fill me-1"></i> Live Demo</span>
+          </div>
+
+          <!-- Circular ATS Score Card -->
+          <div class="text-center my-4">
+            <div class="score-circle-wrap">
+              <svg class="score-circle-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#3b82f6" />
+                    <stop offset="50%" stop-color="#8b5cf6" />
+                    <stop offset="100%" stop-color="#06b6d4" />
+                  </linearGradient>
+                </defs>
+                <circle class="score-circle-bg" cx="50" cy="50" r="40" />
+                <circle class="score-circle-val" cx="50" cy="50" r="40" stroke-dasharray="251.2"
+                  stroke-dashoffset="35" />
+              </svg>
+              <div class="score-number">86<span class="fs-6 text-light text-opacity-75">%</span></div>
+            </div>
+            <div class="mt-2 fw-semibold text-light">Overall ATS Score</div>
+          </div>
+
+          <!-- Breakdown bars -->
+          <div class="space-y-3 mb-3">
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-light"><i class="bi bi-key-fill text-warning me-1"></i> Keyword Optimization</span>
+                <span class="fw-bold text-light">92%</span>
+              </div>
+              <div class="progress bg-dark" style="height: 8px;">
+                <div class="progress-bar bg-gradient" style="width: 92%; background: var(--gradient-main);"></div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-light"><i class="bi bi-layout-text-sidebar-reverse text-info me-1"></i> Formatting &
+                  Structure</span>
+                <span class="fw-bold text-light">88%</span>
+              </div>
+              <div class="progress bg-dark" style="height: 8px;">
+                <div class="progress-bar bg-cyan" style="width: 88%; background: #06b6d4;"></div>
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-light"><i class="bi bi-spellcheck text-success me-1"></i> Grammar & Readability</span>
+                <span class="fw-bold text-light">80%</span>
+              </div>
+              <div class="progress bg-dark" style="height: 8px;">
+                <div class="progress-bar bg-emerald" style="width: 80%; background: #10b981;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 glass-card rounded-3 mt-4 border border-info border-opacity-25"
+            style="background: rgba(6, 182, 212, 0.08);">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-lightbulb-fill text-warning fs-3 me-3"></i>
+              <div>
+                <strong class="d-block text-white" style="font-size:0.95rem;">AI Screening Insight</strong>
+                <small class="text-light text-opacity-90">High match rate detected for Senior Developer roles. 4 missing keywords
+                  recommended for insertion.</small>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Grid Section -->
+<section id="features" class="py-5 border-top border-secondary border-opacity-25">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="display-6 fw-bold">Everything You Need To Pass ATS Screenings</h2>
+      <p class="text-light text-opacity-90 fs-5">Powered by advanced machine learning and NLP resume analysis models.</p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary d-inline-block mb-3">
+            <i class="bi bi-search-heart fs-2"></i>
+          </div>
+          <h4 class="fw-bold mb-2">Real PDF Parser</h4>
+          <p class="text-light text-opacity-90 small">Extracts technical skills, experience, education, projects, certifications, and
+            achievements directly from PDF files.</p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-warning bg-opacity-10 text-warning d-inline-block mb-3">
+            <i class="bi bi-x-octagon-fill fs-2"></i>
+          </div>
+          <h4 class="fw-bold mb-2">AI Rejection Analyzer</h4>
+          <p class="text-light text-opacity-90 small">NEVER simply shows "Rejected". Provides detailed critical issues, missing skills,
+            missing keywords, and dynamic improvement score deltas.</p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-info bg-opacity-10 text-info d-inline-block mb-3">
+            <i class="bi bi-crosshair fs-2"></i>
+          </div>
+          <h4 class="fw-bold mb-2">Job Description Matcher</h4>
+          <p class="text-light text-opacity-90 small">Compares your resume with job postings using TF-IDF cosine similarity to reveal skill
+            gaps and exact match percentages.</p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-success bg-opacity-10 text-success d-inline-block mb-3">
+            <i class="bi bi-linkedin fs-2"></i>
+          </div>
+          <h4 class="fw-bold mb-2">LinkedIn Optimizer</h4>
+          <p class="text-light text-opacity-90 small">Generate optimized headlines, About section templates, featured skills, and recruiter
+            visibility tips tailored to your profile.</p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-danger bg-opacity-10 text-danger d-inline-block mb-3">
+            <i class="bi bi-briefcase-fill fs-2"></i>
+          </div>
+          <h4 class="fw-bold mb-2">Naukri.com Optimizer</h4>
+          <p class="text-light text-opacity-90 small">Improve your Naukri search ranking, recruiter visibility score, keyword density, and
+            notice period optimization.</p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 p-4">
+          <div class="rounded-3 p-3 bg-secondary bg-opacity-10 text-purple d-inline-block mb-3">
+            <i class="bi bi-compass-fill fs-2 text-purple"></i>
+          </div>
+          <h4 class="fw-bold mb-2">AI Career Assistant</h4>
+          <p class="text-light text-opacity-90 small">Personalized skill learning recommendations, project ideas, interview questions, and
+            placement preparation roadmaps.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works Section -->
+<section id="how-it-works" class="py-5 border-top border-secondary border-opacity-25">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="display-6 fw-bold">How It Works</h2>
+      <p class="text-light text-opacity-90 fs-5">From upload to interview-ready in four simple steps.</p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="glass-card h-100 p-4 text-center">
+          <div class="display-5 fw-extrabold text-primary mb-2">1</div>
+          <h5 class="fw-bold">Upload Your PDF</h5>
+          <p class="text-light text-opacity-90 small mb-0">Drop in your resume. Our NLP parser extracts skills, experience, education,
+            projects, and certifications — no fake data, ever.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="glass-card h-100 p-4 text-center">
+          <div class="display-5 fw-extrabold text-info mb-2">2</div>
+          <h5 class="fw-bold">Get Your ATS Score</h5>
+          <p class="text-light text-opacity-90 small mb-0">Receive a real ATS compatibility score across keywords, formatting, skills,
+            experience, education, and summary quality.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="glass-card h-100 p-4 text-center">
+          <div class="display-5 fw-extrabold text-warning mb-2">3</div>
+          <h5 class="fw-bold">Match & Analyze</h5>
+          <p class="text-light text-opacity-90 small mb-0">Compare against any job description to reveal skill gaps, keyword overlap,
+            and AI screening-based rejection risks.</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="glass-card h-100 p-4 text-center">
+          <div class="display-5 fw-extrabold text-success mb-2">4</div>
+          <h5 class="fw-bold">Optimize & Apply</h5>
+          <p class="text-light text-opacity-90 small mb-0">Follow the improvement plan, optimize LinkedIn/Naukri profiles, build new
+            resumes, and download professional PDF reports.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Loved by Professionals (Sample Testimonials) -->
+<section id="testimonials" class="py-5 border-top border-secondary border-opacity-25">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="display-6 fw-bold">Loved by Professionals</h2>
+      <p class="text-light text-opacity-90 fs-5">Hear from job seekers who upgraded their resumes with our platform.</p>
+      <span class="badge bg-secondary bg-opacity-25 text-light px-3 py-2 mt-2">
+        <i class="bi bi-info-circle me-1"></i> Sample testimonials shown for illustration
+      </span>
+    </div>
+
+    <div class="row g-4">
+      <!-- T1 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">AR</div>
+            <div>
+              <strong class="d-block text-white">Ananya Sharma</strong>
+              <small class="text-light text-opacity-75">Software Engineer · Infosys</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+          </div>
+          <p class="text-light small mb-0">"The ATS score showed exactly why my resume was being filtered out. After
+            fixing the missing keywords it flagged, I landed 3 interviews in two weeks."</p>
+        </div>
+      </div>
+      <!-- T2 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">RV</div>
+            <div>
+              <strong class="d-block text-white">Rahul Verma</strong>
+              <small class="text-light text-opacity-75">Data Analyst · Accenture</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+          </div>
+          <p class="text-light small mb-0">"The rejection analyzer is a game changer. Instead of a vague 'rejected', it
+            told me my experience section needed quantified achievements."</p>
+        </div>
+      </div>
+      <!-- T3 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">PK</div>
+            <div>
+              <strong class="d-block text-white">Priya Kulkarni</strong>
+              <small class="text-light text-opacity-75">Product Manager · Flipkart</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+          </div>
+          <p class="text-light small mb-0">"I used the LinkedIn optimizer headlines verbatim and my profile views
+            doubled within a month. The recruiter visibility tips are gold."</p>
+        </div>
+      </div>
+      <!-- T4 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">SM</div>
+            <div>
+              <strong class="d-block text-white">Suresh Menon</strong>
+              <small class="text-light text-opacity-75">DevOps Engineer · Zoho</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+          </div>
+          <p class="text-light small mb-0">"Job matching against real JDs showed me exactly which cloud skills were
+            missing. The career roadmap gave me a clear 3-month plan."</p>
+        </div>
+      </div>
+      <!-- T5 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">NI</div>
+            <div>
+              <strong class="d-block text-white">Neha Iyer</strong>
+              <small class="text-light text-opacity-75">Fresher · B.Tech Graduate</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+          </div>
+          <p class="text-light small mb-0">"As a fresher with no work experience, the project suggestions and Naukri
+            ranking tips helped me get my first offer letter. Worth every rupee!"</p>
+        </div>
+      </div>
+      <!-- T6 -->
+      <div class="col-lg-4 col-md-6">
+        <div class="testimonial-card glass-card h-100 p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="avatar-initials">VG</div>
+            <div>
+              <strong class="d-block text-white">Vikram Gupta</strong>
+              <small class="text-light text-opacity-75">Full Stack Developer · Freelance</small>
+            </div>
+            <span class="badge sample-badge ms-auto">SAMPLE</span>
+          </div>
+          <div class="stars mb-2">
+            <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+              class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+          </div>
+          <p class="text-light small mb-0">"The resume editor let me fix parsing mistakes and instantly re-score.
+            Downloading clean ATS-friendly PDF reports impressed my clients too."</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section id="faq" class="py-5 border-top border-secondary border-opacity-25">
+  <div class="container" style="max-width: 860px;">
+    <div class="text-center mb-5">
+      <h2 class="display-6 fw-bold">Frequently Asked Questions</h2>
+      <p class="text-light text-opacity-90 fs-5">Everything you need to know before getting started.</p>
+    </div>
+
+    <div class="accordion accordion-flush faq-accordion" id="faqAccordion">
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq1">
+            Is my uploaded resume stored securely?
+          </button>
+        </h2>
+        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            Yes. Your files are stored privately on our servers and are only accessible from your own account.
+            We never share your resume or analysis results with third parties, and you can remove any resume from your
+            history at any time.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq2">
+            What do I get on the Free plan?
+          </button>
+        </h2>
+        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            The Free plan includes up to 3 resume scans with full parsing and ATS scoring, plus 2 job-description
+            matches.
+            Premium features like the AI Rejection Analyzer, LinkedIn/Naukri optimizers, career assistant, resume
+            builder/editor, and PDF report downloads require a PRO subscription.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq3">
+            Are the ATS scores real or estimated?
+          </button>
+        </h2>
+        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            Scores are computed from what our parser actually detects in <em>your</em> PDF: extracted skills, section
+            structure,
+            action verbs, measurable achievements, contact details, and keyword coverage. Nothing is invented — if a
+            field cannot be detected,
+            we tell you instead of guessing.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq4">
+            Does the Rejection Analyzer know why a company rejected me?
+          </button>
+        </h2>
+        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            No — and it never claims to. It provides <strong>AI screening-based guidance</strong>: likely reasons a
+            resume might be filtered
+            for a specific job description, based on skill gaps, keyword alignment, formatting, and experience evidence.
+            This analysis is AI-generated guidance and does not represent an actual employer hiring decision.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq5">
+            Which file formats are supported?
+          </button>
+        </h2>
+        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            Currently text-based PDF files up to 10 MB. Scanned or image-only PDFs cannot be parsed because they contain
+            no extractable text —
+            export your resume as a text-based PDF and try again.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item glass-card border-0 mb-2">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse"
+            data-bs-target="#faq6">
+            Can I cancel my subscription?
+          </button>
+        </h2>
+        <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+          <div class="accordion-body text-light text-opacity-90 small">
+            Subscriptions run for 30 days per payment with no auto-renewal charges through this platform — when the
+            period ends,
+            your account simply returns to the Free plan unless you upgrade again. Contact us any time via the Contact
+            page for billing questions.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="py-5">
+  <div class="container">
+    <div class="glass-card glass-card-glow p-5 text-center">
+      <h2 class="fw-extrabold display-6 mb-3">Ready to Beat the ATS?</h2>
+      <p class="text-light text-opacity-90 fs-5 mb-4">Join thousands of job seekers who stopped getting filtered out.</p>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-gradient btn-lg px-5 py-3 fw-bold">
+        Get Started Free <i class="bi bi-arrow-right ms-2"></i>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}
