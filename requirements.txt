@@ -18,3 +18,7 @@ Pillow==10.4.0
 gunicorn==22.0.0
 itsdangerous==2.2.0
 cryptography==43.0.0
+numpy==1.26.4
+blis==0.7.11
+thinc==8.2.5
+spacy==3.7.5
