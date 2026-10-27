@@ -22,11 +22,28 @@ FREE_LIMITS = {
 }
 
 
+def _is_admin_user(user) -> bool:
+    """Check if the given user object is an authenticated administrator."""
+    if not user:
+        return False
+    if hasattr(user, 'is_authenticated') and not user.is_authenticated:
+        return False
+    if hasattr(user, 'check_is_admin') and callable(user.check_is_admin):
+        return bool(user.check_is_admin())
+    if getattr(user, 'is_admin', False):
+        return True
+    role = getattr(user, 'role', '')
+    if role and str(role).strip().lower() == 'admin':
+        return True
+    return False
+
+
 def require_plan(min_plan='pro'):
     """
     Decorator to gate routes based on minimum required user plan.
     If user is on Free plan and accesses Pro/Business feature,
     it shows upgrade notification or renders lock card.
+    Authenticated admin users bypass all plan restrictions.
     """
     def decorator(f):
         @wraps(f)
@@ -34,7 +51,11 @@ def require_plan(min_plan='pro'):
             if not current_user.is_authenticated:
                 flash('Please log in to access this feature.', 'warning')
                 return redirect(url_for('auth.login', next=request.url))
-            
+
+            # Admin bypass: unrestricted access to all features
+            if _is_admin_user(current_user):
+                return f(*args, **kwargs)
+
             user_plan = current_user.get_plan()
             user_level = PLAN_LEVELS.get(user_plan, 0)
             required_level = PLAN_LEVELS.get(min_plan, 1)
@@ -46,10 +67,10 @@ def require_plan(min_plan='pro'):
                         'message': f'This feature requires a {min_plan.upper()} plan.',
                         'required_plan': min_plan
                     }, 403
-                
+
                 flash(f'🔒 This feature requires a {min_plan.upper()} subscription. Upgrade to unlock access!', 'warning')
                 return render_template('pages/premium_lock.html', required_plan=min_plan)
-            
+
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -57,7 +78,7 @@ def require_plan(min_plan='pro'):
 
 def can_upload_resume(user):
     """Check if user has remaining resume upload quota."""
-    if user.get_plan() in ('pro', 'business'):
+    if _is_admin_user(user) or (hasattr(user, 'is_pro') and user.is_pro()) or user.get_plan() in ('pro', 'business'):
         return True, None
     from models import Resume
     count = Resume.query.filter_by(user_id=user.id, is_active=True).count()
@@ -68,7 +89,7 @@ def can_upload_resume(user):
 
 def can_run_job_match(user):
     """Check if user has remaining job match quota."""
-    if user.get_plan() in ('pro', 'business'):
+    if _is_admin_user(user) or (hasattr(user, 'is_pro') and user.is_pro()) or user.get_plan() in ('pro', 'business'):
         return True, None
     from models import JobMatch
     count = JobMatch.query.filter_by(user_id=user.id).count()

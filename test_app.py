@@ -421,6 +421,199 @@ def run_tests():
         "Webhook should reject missing signature with 400 (not CSRF-blocked!)"
     print("[OK] Webhook endpoint accepts server-to-server POSTs (CSRF-exempt, signature-gated)!")
 
+    print("\n--- 14. Testing Admin Unlimited Access Bypass (No Subscription Needed) ---")
+    client.get('/logout')
+    # Create an admin user with default 'free' plan
+    client.post('/register', data={
+        'name': 'Admin User',
+        'email': 'admin@example.com',
+        'password': 'Password123',
+        'confirm_password': 'Password123'
+    }, follow_redirects=True)
+
+    with app.app_context():
+        admin_user = User.query.filter_by(email='admin@example.com').first()
+        admin_user.role = 'admin'
+        admin_user.is_admin = True
+        db.session.commit()
+        assert admin_user.check_is_admin() is True
+        assert admin_user.get_plan() == 'free'  # Admin has free subscription, no payment made
+        assert admin_user.is_pro() is True
+        assert admin_user.is_business() is True
+
+    # 14a. Admin resume uploads beyond free limit (4+ uploads without quota block)
+    for k in range(1, 5):
+        with open(sample_pdf_path, 'rb') as pdf_file:
+            admin_upload = client.post('/scanner', data={
+                'resume': (pdf_file, f'admin_resume_{k}.pdf')
+            }, follow_redirects=True)
+            assert admin_upload.status_code == 200
+            assert b"Free plan is limited to" not in admin_upload.data, f"Admin upload {k} got quota blocked!"
+    print("[OK] Admin can upload unlimited resumes without hitting free-tier limit!")
+
+    with app.app_context():
+        admin_resume = Resume.query.filter_by(user_id=admin_user.id).first()
+        assert admin_resume is not None
+
+        # 14b. Admin job matches beyond free limit (3+ matches without quota block)
+        for m in range(1, 4):
+            admin_match = client.post('/job-match', data={
+                'resume_id': str(admin_resume.id),
+                'job_title': f'Admin Target Role {m}',
+                'company': 'Enterprise Corp',
+                'job_description': 'Looking for a Lead Architect with Python, Flask, Cloud, AI, and Kubernetes experience.'
+            }, follow_redirects=True)
+            assert admin_match.status_code == 200
+            assert b"Free plan is limited to" not in admin_match.data, f"Admin match {m} got quota blocked!"
+        print("[OK] Admin can run unlimited job matches without hitting free-tier limit!")
+
+        admin_job_match = JobMatch.query.filter_by(user_id=admin_user.id).first()
+        assert admin_job_match is not None
+
+        # 14c. Admin access to all PRO gated routes without any subscription
+        admin_pro_routes = [
+            (f'/rejection-analysis/{admin_job_match.id}', 200, b"AI Screening-Based Rejection Reasons"),
+            (f'/linkedin/{admin_resume.id}', 200, b"LinkedIn"),
+            (f'/naukri/{admin_resume.id}', 200, b"Naukri"),
+            (f'/career/{admin_resume.id}', 200, b"Career Guidance"),
+            ('/resume-builder', 200, b"Resume Builder"),
+        ]
+        for route, expected_code, expected_content in admin_pro_routes:
+            res = client.get(route)
+            assert res.status_code == expected_code, f"Admin access to {route} failed with {res.status_code}"
+            assert expected_content in res.data, f"Admin access to {route} did not return expected page content"
+            assert b"Upgrade to unlock access" not in res.data, f"Admin got upgrade lock on {route}"
+            print(f"[OK] Admin direct access verified -> {route}")
+
+        # 14d. Admin PDF download routes
+        admin_pdf_res = client.get(f'/reports/{admin_resume.id}/download')
+        assert admin_pdf_res.status_code == 200
+        assert admin_pdf_res.content_type.startswith('application/pdf')
+        print("[OK] Admin access to PDF report download verified!")
+
+        admin_rej_pdf = client.get(f'/rejection-analysis/{admin_job_match.id}/download')
+        assert admin_rej_pdf.status_code == 200
+        assert admin_rej_pdf.content_type.startswith('application/pdf')
+        print("[OK] Admin access to Rejection analysis PDF verified!")
+
+    # 14e. Verify a regular Free user is STILL blocked from all the above
+    client.get('/logout')
+    client.post('/register', data={
+        'name': 'Standard Free User',
+        'email': 'freeuser@example.com',
+        'password': 'Password123',
+        'confirm_password': 'Password123'
+    }, follow_redirects=True)
+    with app.app_context():
+        free_u = User.query.filter_by(email='freeuser@example.com').first()
+        assert free_u.check_is_admin() is False
+        assert free_u.is_pro() is False
+        assert free_u.is_business() is False
+
+    # Upload 1 resume for the free user to test gating
+    with open(sample_pdf_path, 'rb') as pdf_file:
+        client.post('/scanner', data={'resume': (pdf_file, 'free_resume.pdf')}, follow_redirects=True)
+    with app.app_context():
+        free_resume = Resume.query.filter_by(user_id=free_u.id).first()
+
+    locked_res = client.get(f'/linkedin/{free_resume.id}')
+    assert b"Requires PRO" in locked_res.data or b"Premium Feature" in locked_res.data
+    print("[OK] Normal free user is still strictly restricted from premium features!")
+
+    print("\n--- 15. Testing Specific Admin Account kanugukaveri31@gmail.com & CLI Assignment ---")
+    client.get('/logout')
+    # Step 1: Register kanugukaveri31@gmail.com through regular registration
+    client.post('/register', data={
+        'name': 'Kaveri Kanugu',
+        'email': 'kanugukaveri31@gmail.com',
+        'password': 'Password123',
+        'confirm_password': 'Password123'
+    }, follow_redirects=True)
+
+    with app.app_context():
+        target_user = User.query.filter_by(email='kanugukaveri31@gmail.com').first()
+        assert target_user is not None
+        # Verify requirement 7: not automatically promoted based only on email address
+        assert target_user.check_is_admin() is False
+        assert target_user.is_admin is False
+        assert target_user.role == 'user'
+        assert target_user.get_plan() == 'free'
+        assert target_user.is_pro() is False
+    print("[OK] User kanugukaveri31@gmail.com not automatically promoted on registration (secure baseline)!")
+
+    # Step 2: Use the secure grant-admin CLI command
+    runner = app.test_cli_runner()
+    cli_res = runner.invoke(args=['grant-admin', 'kanugukaveri31@gmail.com'])
+    assert cli_res.exit_code == 0
+    assert "Success" in cli_res.output
+    print("[OK] Secure CLI command 'grant-admin' executed successfully!")
+
+    # Step 3: Verify the account now has full admin privileges without purchasing a subscription
+    with app.app_context():
+        target_user = User.query.filter_by(email='kanugukaveri31@gmail.com').first()
+        assert target_user.check_is_admin() is True
+        assert target_user.is_admin is True
+        assert target_user.role == 'admin'
+        assert target_user.get_plan() == 'free'  # No paid subscription purchased
+        assert target_user.is_pro() is True
+        assert target_user.is_business() is True
+    print("[OK] Admin account kanugukaveri31@gmail.com verified as admin with free plan (no purchase needed)!")
+
+    # Step 4: Verify kanugukaveri31@gmail.com has unlimited resume uploads (4+ uploads)
+    client.post('/login', data={'email': 'kanugukaveri31@gmail.com', 'password': 'Password123'}, follow_redirects=True)
+    for k in range(1, 5):
+        with open(sample_pdf_path, 'rb') as pdf_file:
+            up_res = client.post('/scanner', data={
+                'resume': (pdf_file, f'kaveri_resume_{k}.pdf')
+            }, follow_redirects=True)
+            assert up_res.status_code == 200
+            assert b"Free plan is limited to" not in up_res.data, f"Upload {k} blocked for kanugukaveri31@gmail.com!"
+    print("[OK] Admin kanugukaveri31@gmail.com uploaded unlimited resumes without quota restriction!")
+
+    with app.app_context():
+        k_resume = Resume.query.filter_by(user_id=target_user.id).first()
+        assert k_resume is not None
+
+        # Step 5: Verify kanugukaveri31@gmail.com has unlimited job matches (3+ matches)
+        for m in range(1, 4):
+            match_res = client.post('/job-match', data={
+                'resume_id': str(k_resume.id),
+                'job_title': f'Lead Engineer {m}',
+                'company': 'Tech Corp',
+                'job_description': 'Python Flask SQL AWS Docker React full stack engineer.'
+            }, follow_redirects=True)
+            assert match_res.status_code == 200
+            assert b"Free plan is limited to" not in match_res.data, f"Job match {m} blocked for kanugukaveri31@gmail.com!"
+        print("[OK] Admin kanugukaveri31@gmail.com ran unlimited job matches without quota restriction!")
+
+        k_match = JobMatch.query.filter_by(user_id=target_user.id).first()
+        assert k_match is not None
+
+        # Step 6: Verify full access to all PRO-gated features
+        admin_features = [
+            (f'/rejection-analysis/{k_match.id}', 200, b"AI Screening-Based Rejection Reasons"),
+            (f'/linkedin/{k_resume.id}', 200, b"LinkedIn"),
+            (f'/naukri/{k_resume.id}', 200, b"Naukri"),
+            (f'/career/{k_resume.id}', 200, b"Career Guidance"),
+            ('/resume-builder', 200, b"Resume Builder"),
+        ]
+        for route, code, content in admin_features:
+            r = client.get(route)
+            assert r.status_code == code, f"Access to {route} failed with {r.status_code}"
+            assert content in r.data, f"Access to {route} missing expected content"
+            assert b"Upgrade to unlock access" not in r.data, f"Access to {route} got upgrade lock"
+            print(f"[OK] Full feature access verified for kanugukaveri31@gmail.com -> {route}")
+
+        # PDF download tests
+        r_pdf = client.get(f'/reports/{k_resume.id}/download')
+        assert r_pdf.status_code == 200
+        assert r_pdf.content_type.startswith('application/pdf')
+
+        rej_pdf = client.get(f'/rejection-analysis/{k_match.id}/download')
+        assert rej_pdf.status_code == 200
+        assert rej_pdf.content_type.startswith('application/pdf')
+        print("[OK] PDF reports accessible without subscription for kanugukaveri31@gmail.com!")
+
     print("\n==================================================")
     print("ALL TEST SUITE VERIFICATIONS PASSED SUCCESSFULLY!")
     print("==================================================")

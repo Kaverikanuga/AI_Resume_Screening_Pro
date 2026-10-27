@@ -97,29 +97,74 @@ def create_app(config_name: str = None) -> Flask:
     def inject_template_globals():
         return {'now': lambda: datetime.now(timezone.utc)}
 
+    # CLI commands for secure administrator management
+    _register_admin_cli_commands(app)
+
     logger.info(f"App created with config: {config_name}")
     return app
 
 
+def _register_admin_cli_commands(app: Flask) -> None:
+    """Register CLI commands to manage administrators securely via terminal."""
+    import click
+
+    @app.cli.command('grant-admin')
+    @click.argument('email')
+    def grant_admin(email: str):
+        """Securely grant administrator privileges to a registered user account."""
+        email_clean = email.strip().lower()
+        with app.app_context():
+            from models import User
+            user = User.query.filter_by(email=email_clean).first()
+            if not user:
+                click.echo(f"Error: User with email '{email_clean}' not found in the database.")
+                click.echo("Please register the user first via the web interface (/register), then run this command.")
+                return
+            user.is_admin = True
+            user.role = 'admin'
+            db.session.commit()
+            click.echo(f"Success: Administrator privileges granted to '{email_clean}' (User ID: {user.id}).")
+
+    @app.cli.command('revoke-admin')
+    @click.argument('email')
+    def revoke_admin(email: str):
+        """Revoke administrator privileges from a user account."""
+        email_clean = email.strip().lower()
+        with app.app_context():
+            from models import User
+            user = User.query.filter_by(email=email_clean).first()
+            if not user:
+                click.echo(f"Error: User with email '{email_clean}' not found in the database.")
+                return
+            user.is_admin = False
+            user.role = 'user'
+            db.session.commit()
+            click.echo(f"Success: Administrator privileges revoked from '{email_clean}'.")
+
+
 def _ensure_performance_indexes(app: Flask) -> None:
-    """Create hot-path indexes if they do not already exist (safe to re-run)."""
-    statements = [
-        "CREATE INDEX IF NOT EXISTS ix_resumes_user_active ON resumes (user_id, is_active)",
-        "CREATE INDEX IF NOT EXISTS ix_job_matches_user ON job_matches (user_id)",
-        "CREATE INDEX IF NOT EXISTS ix_job_matches_resume ON job_matches (resume_id)",
-        "CREATE INDEX IF NOT EXISTS ix_generated_reports_user ON generated_reports (user_id)",
-        "CREATE INDEX IF NOT EXISTS ix_resume_docs_user ON resume_docs (user_id)",
-    ]
+    """Create hot-path indexes and ensure schema columns if they do not already exist (safe to re-run)."""
     try:
         with app.app_context():
+            is_postgres = db.engine.dialect.name == 'postgresql'
+            bool_default = 'FALSE' if is_postgres else '0'
+            statements = [
+                "ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'user'",
+                f"ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT {bool_default}",
+                "CREATE INDEX IF NOT EXISTS ix_resumes_user_active ON resumes (user_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS ix_job_matches_user ON job_matches (user_id)",
+                "CREATE INDEX IF NOT EXISTS ix_job_matches_resume ON job_matches (resume_id)",
+                "CREATE INDEX IF NOT EXISTS ix_generated_reports_user ON generated_reports (user_id)",
+                "CREATE INDEX IF NOT EXISTS ix_resume_docs_user ON resume_docs (user_id)",
+            ]
             for stmt in statements:
                 try:
                     db.session.execute(text(stmt))
+                    db.session.commit()
                 except Exception:
                     db.session.rollback()
-            db.session.commit()
     except Exception as e:
-        logger.warning(f"Performance index creation skipped: {e}")
+        logger.warning(f"Performance index/schema verification skipped: {e}")
 
 
 if __name__ == '__main__':

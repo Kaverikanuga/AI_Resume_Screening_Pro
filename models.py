@@ -23,6 +23,8 @@ class User(UserMixin, db.Model):
     avatar = db.Column(db.String(300), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(50), default='user')
+    is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -46,16 +48,23 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    def check_is_admin(self):
+        return bool(self.is_admin or (self.role and str(self.role).strip().lower() == 'admin'))
+
     def get_plan(self):
         if self.subscription and self.subscription.is_active():
             return self.subscription.plan
         return 'free'
 
     def is_pro(self):
+        if self.check_is_admin():
+            return True
         plan = self.get_plan()
         return plan in ('pro', 'business')
 
     def is_business(self):
+        if self.check_is_admin():
+            return True
         return self.get_plan() == 'business'
 
     def latest_resume(self):

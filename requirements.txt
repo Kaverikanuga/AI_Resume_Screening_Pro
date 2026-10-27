@@ -22,3 +22,4 @@ numpy==1.26.4
 blis==0.7.11
 thinc==8.2.5
 spacy==3.7.5
+psycopg2-binary>=2.9.9
