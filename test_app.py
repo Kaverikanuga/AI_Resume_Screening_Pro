@@ -22,6 +22,7 @@ from models import (
     ResumeDoc, GeneratedReport, ContactMessage,
 )
 from services.payment_service import verify_payment_signature, verify_webhook_signature
+from utils import _is_admin_user
 
 
 def create_sample_pdf(filepath):
@@ -516,9 +517,11 @@ def run_tests():
     with app.app_context():
         free_resume = Resume.query.filter_by(user_id=free_u.id).first()
 
-    locked_res = client.get(f'/linkedin/{free_resume.id}')
-    assert b"Requires PRO" in locked_res.data or b"Premium Feature" in locked_res.data
-    print("[OK] Normal free user is still strictly restricted from premium features!")
+    for route in (f'/linkedin/{free_resume.id}', f'/naukri/{free_resume.id}'):
+        locked_res = client.get(route)
+        assert locked_res.status_code == 200
+        assert b"Requires PRO" in locked_res.data or b"Premium Feature" in locked_res.data
+        print(f"[OK] Normal free user remains restricted -> {route}")
 
     print("\n--- 15. Testing Specific Admin Account kanugukaveri31@gmail.com & CLI Assignment ---")
     client.get('/logout')
@@ -559,6 +562,28 @@ def run_tests():
         assert target_user.is_business() is True
     print("[OK] Admin account kanugukaveri31@gmail.com verified as admin with free plan (no purchase needed)!")
 
+    class InconsistentAdminUser:
+        is_authenticated = True
+        is_admin = True
+        role = 'user'
+
+        def check_is_admin(self):
+            return False
+
+    assert _is_admin_user(InconsistentAdminUser()) is True
+    print("[OK] Stored admin flag is honored even if check_is_admin() disagrees!")
+
+    class InconsistentRoleUser:
+        is_authenticated = True
+        is_admin = False
+        role = 'admin'
+
+        def check_is_admin(self):
+            return False
+
+    assert _is_admin_user(InconsistentRoleUser()) is True
+    print("[OK] Stored admin role is honored even if check_is_admin() disagrees!")
+
     # Step 4: Verify kanugukaveri31@gmail.com has unlimited resume uploads (4+ uploads)
     client.post('/login', data={'email': 'kanugukaveri31@gmail.com', 'password': 'Password123'}, follow_redirects=True)
     for k in range(1, 5):
@@ -573,6 +598,24 @@ def run_tests():
     with app.app_context():
         k_resume = Resume.query.filter_by(user_id=target_user.id).first()
         assert k_resume is not None
+        target_user_id = target_user.id
+
+        for is_admin_flag, role in ((True, 'user'), (False, 'admin')):
+            target_user.is_admin = is_admin_flag
+            target_user.role = role
+            db.session.commit()
+            for route in (f'/linkedin/{k_resume.id}', f'/naukri/{k_resume.id}'):
+                marker_res = client.get(route)
+                assert marker_res.status_code == 200, \
+                    f"Admin marker combination is blocked from {route}"
+                assert b"Premium Feature" not in marker_res.data
+                assert b"Requires PRO" not in marker_res.data
+                print(f"[OK] Free-plan admin marker ({role}, {is_admin_flag}) accesses {route}")
+
+        target_user = db.session.get(User, target_user_id)
+        target_user.is_admin = True
+        target_user.role = 'admin'
+        db.session.commit()
 
         # Step 5: Verify kanugukaveri31@gmail.com has unlimited job matches (3+ matches)
         for m in range(1, 4):

@@ -28,14 +28,14 @@ def _is_admin_user(user) -> bool:
         return False
     if hasattr(user, 'is_authenticated') and not user.is_authenticated:
         return False
-    if hasattr(user, 'check_is_admin') and callable(user.check_is_admin):
-        return bool(user.check_is_admin())
-    if getattr(user, 'is_admin', False):
-        return True
+    check_is_admin = getattr(user, 'check_is_admin', None)
+    method_says_admin = bool(check_is_admin()) if callable(check_is_admin) else False
     role = getattr(user, 'role', '')
-    if role and str(role).strip().lower() == 'admin':
-        return True
-    return False
+    return (
+        method_says_admin
+        or bool(getattr(user, 'is_admin', False))
+        or bool(role and str(role).strip().lower() == 'admin')
+    )
 
 
 def require_plan(min_plan='pro'):
