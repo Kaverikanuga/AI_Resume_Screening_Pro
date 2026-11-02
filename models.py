@@ -4,7 +4,7 @@ import hmac
 from flask import current_app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import Index
+from sqlalchemy import Index, text
 from extensions import db, login_manager
 import json
 
@@ -38,8 +38,10 @@ class User(UserMixin, db.Model):
     avatar = db.Column(db.String(300), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)
-    role = db.Column(db.String(50), default='user')
-    is_admin = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(50), nullable=False, default='user',
+                     server_default=text("'user'"))
+    is_admin = db.Column(db.Boolean, nullable=False, default=False,
+                         server_default=text('false'))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))

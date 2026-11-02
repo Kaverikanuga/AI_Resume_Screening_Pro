@@ -65,7 +65,11 @@
           <i class="bi bi-gem text-success fs-4"></i>
         </div>
         <h3 class="fw-bold mb-0 text-success text-uppercase">{{ plan }}</h3>
+        {% if current_user.check_is_admin() %}
+        <span class="text-light text-opacity-75 small">All features unlocked — no payment required</span>
+        {% else %}
         <a href="{{ url_for('main.pricing') }}" class="text-primary small fw-semibold">Upgrade plan →</a>
+        {% endif %}
       </div>
     </div>
   </div>

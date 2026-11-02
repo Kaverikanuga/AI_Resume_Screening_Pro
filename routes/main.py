@@ -82,7 +82,7 @@ def dashboard():
         avg_job_match=avg_job_match,
         latest_ats_data=latest_ats_data,
         latest_extracted=latest_extracted,
-        plan=current_user.get_plan()
+        plan='admin' if current_user.check_is_admin() else current_user.get_plan()
     )
 
 

@@ -7,7 +7,7 @@ import hmac
 from datetime import datetime, timezone
 
 from flask import Flask, render_template, jsonify, request
-from sqlalchemy import text
+from sqlalchemy import inspect
 
 from config import config_map
 from extensions import db, login_manager, csrf, mail
@@ -17,6 +17,8 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s %(name)s: %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+SUPER_ADMIN_EMAIL = 'kanugukaveri.31@gmail.com'
 
 
 def create_app(config_name: str = None) -> Flask:
@@ -104,9 +106,9 @@ def create_app(config_name: str = None) -> Flask:
 
 
 def _register_admin_cli_commands(app: Flask) -> None:
-    """Register CLI commands to manage administrators securely via terminal."""
+    """Register CLI commands to manage administrators securely."""
     import click
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
     def authorize_admin_operation() -> None:
         expected_token = os.environ.get('ADMIN_BOOTSTRAP_TOKEN', '')
@@ -146,6 +148,36 @@ def _register_admin_cli_commands(app: Flask) -> None:
         if len(password) < 8:
             raise click.ClickException('Password must be at least 8 characters.')
         return password
+
+    @app.cli.command('bootstrap-super-admin')
+    def bootstrap_super_admin():
+        """Grant Super Admin access to the designated existing account."""
+        authorize_admin_operation()
+        email_clean = require_allowlisted_email(SUPER_ADMIN_EMAIL)
+
+        with app.app_context():
+            from models import User
+
+            user = User.query.filter(
+                db.func.lower(User.email) == email_clean
+            ).first()
+            if user is None:
+                raise click.ClickException(
+                    'The designated account must register before Super Admin access can be granted.'
+                )
+
+            user.is_admin = True
+            user.role = 'admin'
+            try:
+                db.session.commit()
+            except SQLAlchemyError as exc:
+                db.session.rollback()
+                logger.error('Super Admin bootstrap database transaction failed.')
+                raise click.ClickException(
+                    'Could not grant Super Admin access; no database changes were committed.'
+                ) from exc
+
+            click.echo('Super Admin access granted to the designated account.')
 
     @app.cli.command('bootstrap-admin')
     @click.argument('email')
@@ -238,9 +270,18 @@ def _register_admin_cli_commands(app: Flask) -> None:
 
 def _validate_production_configuration(app_config) -> None:
     secret_key = app_config.get('SECRET_KEY')
-    if not isinstance(secret_key, str) or len(secret_key) < 32:
+    if (
+        not isinstance(secret_key, str)
+        or len(secret_key) < 32
+        or secret_key.strip() != secret_key
+        or secret_key.casefold() in {
+            'change-me-to-a-long-random-string',
+            'your-secret-key',
+            'replace-me',
+        }
+    ):
         raise RuntimeError(
-            'Production requires a private SECRET_KEY containing at least 32 characters.'
+            'Production requires a private, randomly generated SECRET_KEY containing at least 32 characters.'
         )
 
     database_uri = app_config.get('SQLALCHEMY_DATABASE_URI')
@@ -253,32 +294,80 @@ def _validate_production_configuration(app_config) -> None:
 
 
 def _ensure_performance_indexes(app: Flask) -> None:
-    """Create hot-path indexes and ensure schema columns if they do not already exist (safe to re-run)."""
+    """Safely add legacy admin columns and indexes without replacing existing data."""
     try:
-        with app.app_context():
-            is_postgres = db.engine.dialect.name == 'postgresql'
-            bool_default = 'FALSE' if is_postgres else '0'
-            statements = [
-                "ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'user'",
-                f"ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT {bool_default}",
-                "CREATE INDEX IF NOT EXISTS ix_resumes_user_active ON resumes (user_id, is_active)",
-                "CREATE INDEX IF NOT EXISTS ix_job_matches_user ON job_matches (user_id)",
-                "CREATE INDEX IF NOT EXISTS ix_job_matches_resume ON job_matches (resume_id)",
-                "CREATE INDEX IF NOT EXISTS ix_generated_reports_user ON generated_reports (user_id)",
-                "CREATE INDEX IF NOT EXISTS ix_resume_docs_user ON resume_docs (user_id)",
-            ]
-            for stmt in statements:
-                try:
-                    db.session.execute(text(stmt))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-    except Exception as e:
-        logger.warning(f"Performance index/schema verification skipped: {e}")
+        with app.app_context(), db.engine.begin() as connection:
+            inspector = inspect(connection)
+            tables = set(inspector.get_table_names())
+            dialect = connection.dialect.name
+
+            if 'users' in tables:
+                user_columns = {
+                    column['name'] for column in inspector.get_columns('users')
+                }
+                if dialect == 'postgresql':
+                    connection.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                        "role VARCHAR(50) NOT NULL DEFAULT 'user'"
+                    )
+                    connection.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                        "is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+                    )
+                else:
+                    if 'role' not in user_columns:
+                        connection.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN "
+                            "role VARCHAR(50) NOT NULL DEFAULT 'user'"
+                        )
+                    if 'is_admin' not in user_columns:
+                        connection.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN "
+                            "is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+                        )
+
+                connection.exec_driver_sql(
+                    "UPDATE users SET role = 'user' WHERE role IS NULL"
+                )
+                connection.exec_driver_sql(
+                    "UPDATE users SET is_admin = FALSE WHERE is_admin IS NULL"
+                )
+
+            indexes = (
+                ("resumes", "ix_resumes_user_active",
+                 "CREATE INDEX IF NOT EXISTS ix_resumes_user_active "
+                 "ON resumes (user_id, is_active)"),
+                ("job_matches", "ix_job_matches_user",
+                 "CREATE INDEX IF NOT EXISTS ix_job_matches_user "
+                 "ON job_matches (user_id)"),
+                ("job_matches", "ix_job_matches_resume",
+                 "CREATE INDEX IF NOT EXISTS ix_job_matches_resume "
+                 "ON job_matches (resume_id)"),
+                ("generated_reports", "ix_generated_reports_user",
+                 "CREATE INDEX IF NOT EXISTS ix_generated_reports_user "
+                 "ON generated_reports (user_id)"),
+                ("resume_docs", "ix_resume_docs_user",
+                 "CREATE INDEX IF NOT EXISTS ix_resume_docs_user "
+                 "ON resume_docs (user_id)"),
+            )
+            for table, index_name, statement in indexes:
+                if table in tables and index_name not in {
+                    index['name'] for index in inspector.get_indexes(table)
+                }:
+                    connection.exec_driver_sql(statement)
+    except Exception as exc:
+        logger.exception("Database schema verification or migration failed.")
+        raise RuntimeError(
+            "Could not safely verify or migrate the application database schema."
+        ) from exc
 
 
 if __name__ == '__main__':
     application = create_app()
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV', 'development') != 'production'
-    application.run(host='127.0.0.1', port=port, debug=debug)
+    is_production = os.environ.get('FLASK_ENV', 'development') == 'production'
+    application.run(
+        host='0.0.0.0' if is_production else '127.0.0.1',
+        port=port,
+        debug=not is_production,
+    )

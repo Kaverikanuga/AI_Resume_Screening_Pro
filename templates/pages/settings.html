@@ -13,9 +13,16 @@
         <div class="p-3 glass-card rounded-3 mb-4 border border-secondary border-opacity-25">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-muted small">Current Active Plan:</span>
+            {% if current_user.check_is_admin() %}
+            <span class="badge bg-warning text-dark text-uppercase fs-6">ADMIN</span>
+            {% else %}
             <span class="badge bg-primary text-uppercase fs-6">{{ subscription.plan if subscription else 'FREE'
               }}</span>
+            {% endif %}
           </div>
+          {% if current_user.check_is_admin() %}
+          <p class="text-success small mb-3">All PRO features are unlocked. Admin access does not require payment.</p>
+          {% endif %}
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="text-muted small">Subscription Status:</span>
             <span class="badge bg-success text-uppercase">{{ subscription.status if subscription else 'ACTIVE' }}</span>
@@ -28,9 +35,11 @@
           {% endif %}
         </div>
 
+        {% if not current_user.check_is_admin() %}
         <a href="{{ url_for('main.pricing') }}" class="btn btn-gradient w-100 py-2 mb-4">
           <i class="bi bi-arrow-up-circle me-1"></i> Upgrade Subscription
         </a>
+        {% endif %}
 
         <h5 class="fw-bold mb-3"><i class="bi bi-receipt me-2 text-info"></i> Payment History</h5>
         {% if payments %}

@@ -129,7 +129,11 @@
             <div class="fw-bold text-white small">{{ current_user.name.split()[0] }}</div>
             <small class="text-muted" style="font-size:0.7rem;">{{ current_user.email }}</small>
           </div>
+          {% if current_user.check_is_admin() %}
+          <span class="badge bg-warning text-dark text-uppercase" style="font-size:0.6rem;">ADMIN</span>
+          {% else %}
           <span class="badge bg-primary text-uppercase" style="font-size:0.6rem;">{{ current_user.get_plan() }}</span>
+          {% endif %}
         </div>
       </div>
     </aside>
@@ -153,10 +157,14 @@
             style="font-size:0.85rem;">
             <i class="bi bi-cloud-upload me-1"></i> Scan Resume
           </a>
+          {% if current_user.check_is_admin() %}
+          <span class="badge bg-warning text-dark text-uppercase py-2 px-3">ADMIN</span>
+          {% else %}
           <a href="{{ url_for('main.pricing') }}" class="btn btn-sm btn-outline-glass py-1 px-2 text-warning"
             style="font-size:0.85rem;">
             <i class="bi bi-gem me-1"></i> {{ current_user.get_plan().upper() }}
           </a>
+          {% endif %}
         </div>
       </header>
 

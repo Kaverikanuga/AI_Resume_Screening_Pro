@@ -18,11 +18,16 @@ from unittest.mock import patch
 import pytest
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from sqlalchemy import inspect, text
 
-from app import create_app, _validate_production_configuration
+from app import (
+    create_app,
+    _ensure_performance_indexes,
+    _validate_production_configuration,
+)
 from extensions import db
 from models import (
-    User, Resume, JobMatch, UserSubscription,
+    User, Resume, JobMatch, UserSubscription, Payment,
     ResumeDoc, GeneratedReport, ContactMessage,
 )
 from services.payment_service import verify_payment_signature, verify_webhook_signature
@@ -380,6 +385,127 @@ def test_admin_bootstrap_claims_pre_registered_account_securely(
         assert b'Premium Feature' not in response.data
 
 
+def test_super_admin_bootstrap_is_scoped_idempotent_and_preserves_account(
+    app
+):
+    email = 'kanugukaveri.31@gmail.com'
+    client = app.test_client()
+    password = secrets.token_urlsafe(16)
+    registration = client.post('/register', data={
+        'name': 'Existing Kaveri Account',
+        'email': email,
+        'password': password,
+        'confirm_password': password,
+    })
+    assert registration.status_code == 302
+
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        user_id = user.id
+        password_hash = user.password_hash
+        subscription = user.subscription
+        subscription.plan = 'pro'
+        subscription.status = 'active'
+        db.session.commit()
+        subscription_id = subscription.id
+        subscription_started_at = subscription.started_at
+
+        ordinary_user = User(name='Unaffected Account', email='unauthorized@example.com')
+        ordinary_user.set_password(TEST_PASSWORD)
+        db.session.add(ordinary_user)
+        db.session.commit()
+        ordinary_user_id = ordinary_user.id
+
+    owner_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': f'{email},unauthorized@example.com',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        wrong_token = app.test_cli_runner().invoke(
+            args=['bootstrap-super-admin'],
+            input=f'{secrets.token_urlsafe(32)}\n',
+        )
+        assert wrong_token.exit_code != 0
+        assert 'authorization failed' in wrong_token.output
+        assert owner_token not in wrong_token.output
+
+        result = app.test_cli_runner().invoke(
+            args=['bootstrap-super-admin'],
+            input=f'{owner_token}\n',
+        )
+        assert result.exit_code == 0, result.output
+        assert owner_token not in result.output
+        assert password not in result.output
+
+        repeated_result = app.test_cli_runner().invoke(
+            args=['bootstrap-super-admin'],
+            input=f'{owner_token}\n',
+        )
+        assert repeated_result.exit_code == 0, repeated_result.output
+
+        with app.app_context():
+            unchanged = User.query.filter_by(email=email).one()
+            assert unchanged.id == user_id
+            assert unchanged.name == 'Existing Kaveri Account'
+            assert unchanged.password_hash == password_hash
+            assert unchanged.is_admin is True
+            assert unchanged.role == 'admin'
+            assert unchanged.subscription.id == subscription_id
+            assert unchanged.subscription.plan == 'pro'
+            assert unchanged.subscription.started_at == subscription_started_at
+            unaffected = db.session.get(User, ordinary_user_id)
+            assert unaffected.email == 'unauthorized@example.com'
+            assert unaffected.is_admin is False
+            assert unaffected.role == 'user'
+
+    stale_session = client.get('/dashboard')
+    assert stale_session.status_code == 302
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': password,
+    })
+    assert login_response.status_code == 302
+
+
+def test_super_admin_bootstrap_requires_allowlist_and_existing_target_account(
+    app
+):
+    owner_token = secrets.token_urlsafe(32)
+    email = 'kanugukaveri.31@gmail.com'
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': 'another@example.com',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        not_allowlisted = app.test_cli_runner().invoke(
+            args=['bootstrap-super-admin'],
+            input=f'{owner_token}\n',
+        )
+        assert not_allowlisted.exit_code != 0
+        assert 'ADMIN_EMAILS' in not_allowlisted.output
+
+        with app.app_context():
+            user = User(name='Another Account', email='another@example.com')
+            user.set_password(TEST_PASSWORD)
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+
+        with patch.dict(os.environ, {'ADMIN_EMAILS': email}):
+            account_not_registered = app.test_cli_runner().invoke(
+                args=['bootstrap-super-admin'],
+                input=f'{owner_token}\n',
+            )
+            assert account_not_registered.exit_code != 0
+            assert 'must register' in account_not_registered.output
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.email == 'another@example.com'
+        assert user.is_admin is False
+        assert user.role == 'user'
+        assert User.query.filter_by(email=email).first() is None
+
+
 def test_admin_grant_requires_owner_token(app, authenticated_free_user):
     client, user_id, resume_id, _ = authenticated_free_user
     owner_token = secrets.token_urlsafe(32)
@@ -494,11 +620,214 @@ def test_production_configuration_requires_private_secret_and_persistent_databas
 
     for invalid_config in (
         {**valid_config, 'SECRET_KEY': 'short'},
+        {**valid_config, 'SECRET_KEY': 'change-me-to-a-long-random-string'},
         {**valid_config, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///temporary.db'},
         {**valid_config, 'SQLALCHEMY_DATABASE_URI': None},
     ):
         with pytest.raises(RuntimeError):
             _validate_production_configuration(invalid_config)
+
+
+def test_legacy_admin_columns_are_migrated_without_losing_user_data(app):
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
+        with db.engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE users ("
+                "id INTEGER PRIMARY KEY, "
+                "name VARCHAR(150) NOT NULL, "
+                "email VARCHAR(150) NOT NULL UNIQUE, "
+                "password_hash VARCHAR(256) NOT NULL)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, name, email, password_hash) "
+                "VALUES (1, 'Existing User', 'existing@example.com', 'stored-hash')"
+            )
+
+        _ensure_performance_indexes(app)
+        _ensure_performance_indexes(app)
+
+        columns = {
+            column['name']
+            for column in inspect(db.engine).get_columns('users')
+        }
+        assert {'role', 'is_admin'} <= columns
+        migrated_user = db.session.execute(
+            text(
+                "SELECT name, email, password_hash, role, is_admin "
+                "FROM users WHERE id = 1"
+            )
+        ).one()
+        assert migrated_user == (
+            'Existing User',
+            'existing@example.com',
+            'stored-hash',
+            'user',
+            False,
+        )
+
+
+def test_requested_admin_email_requires_authorized_cli_promotion(app):
+    email = 'kanugukaveri.31@gmail.com'
+    client = app.test_client()
+    registration = client.post('/register', data={
+        'name': 'Kaveri Kanugu',
+        'email': email,
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD,
+    })
+    assert registration.status_code == 302
+
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.is_admin is False
+        assert user.role == 'user'
+        assert user.get_plan() == 'free'
+        user_id = user.id
+
+    owner_token = secrets.token_urlsafe(32)
+    owner_password = secrets.token_urlsafe(16)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': email,
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        result = app.test_cli_runner().invoke(
+            args=['grant-admin', email],
+            input=f'{owner_token}\n{owner_password}\n{owner_password}\n',
+        )
+
+    assert result.exit_code == 0, result.output
+    assert owner_token not in result.output
+    assert owner_password not in result.output
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is True
+        assert user.role == 'admin'
+        assert user.get_plan() == 'free'
+        assert user.is_pro() is True
+        assert user.is_business() is True
+
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': owner_password,
+    })
+    assert login_response.status_code == 302
+    dashboard = client.get('/dashboard')
+    assert dashboard.status_code == 200
+    assert b'ADMIN' in dashboard.data
+    assert b'All features unlocked' in dashboard.data
+
+
+def test_admin_ui_shows_access_without_payment_and_free_user_checkout_remains(app):
+    client = app.test_client()
+    registration = client.post('/register', data={
+        'name': 'Pricing Test User',
+        'email': 'pricing-test@example.com',
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD,
+    })
+    assert registration.status_code == 302
+
+    free_pricing = client.get('/pricing')
+    assert b"initiateRazorpayPayment('pro'" in free_pricing.data
+    assert b"initiateRazorpayPayment('business'" in free_pricing.data
+    assert b'checkout.razorpay.com' in free_pricing.data
+
+    with app.app_context():
+        user = User.query.filter_by(email='pricing-test@example.com').one()
+        user.is_admin = True
+        user.role = 'admin'
+        db.session.commit()
+        user_id = user.id
+    authenticate_client(client, app, user_id)
+
+    pricing = client.get('/pricing')
+    assert b'Admin access is active' in pricing.data
+    assert b'Included with Admin access' in pricing.data
+    assert b'initiateRazorpayPayment' not in pricing.data
+    assert b'checkout.razorpay.com' not in pricing.data
+
+    settings = client.get('/settings')
+    assert b'ADMIN' in settings.data
+    assert b'Admin access does not require payment' in settings.data
+    assert b'Upgrade Subscription' not in settings.data
+
+
+def test_profile_cannot_change_users_own_role_or_admin_flag(
+    app, authenticated_free_user
+):
+    client, user_id, _, _ = authenticated_free_user
+    response = client.post('/profile', data={
+        'name': 'Updated Test User',
+        'phone': '',
+        'location': '',
+        'role': 'admin',
+        'is_admin': 'true',
+    })
+    assert response.status_code == 302
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.role == 'user'
+        assert user.is_admin is False
+
+
+def test_payment_order_and_verification_still_activate_paid_plan(
+    app, authenticated_free_user
+):
+    client, user_id, _, _ = authenticated_free_user
+    app.config.update(
+        RAZORPAY_KEY_ID='test-key-id',
+        RAZORPAY_KEY_SECRET='test-key-secret',
+    )
+    with patch('routes.payment.create_order', return_value={
+        'success': True,
+        'order_id': 'order_test_pro',
+        'amount': 5900,
+        'currency': 'INR',
+    }):
+        order_response = client.post(
+            '/payment/create-order',
+            json={'plan': 'pro'},
+        )
+
+    assert order_response.status_code == 200
+    assert order_response.get_json()['order_id'] == 'order_test_pro'
+    with app.app_context():
+        payment = Payment.query.filter_by(
+            razorpay_order_id='order_test_pro'
+        ).one()
+        assert payment.user_id == user_id
+        assert payment.plan == 'pro'
+        assert payment.status == 'pending'
+
+    verification_payload = {
+        'razorpay_order_id': 'order_test_pro',
+        'razorpay_payment_id': 'payment_test_pro',
+        'razorpay_signature': 'verified-by-test-double',
+        'plan': 'business',
+    }
+    with patch('routes.payment.verify_payment_signature', return_value=True):
+        verified = client.post('/payment/verify', json=verification_payload)
+        assert verified.status_code == 200
+    with app.app_context():
+        started_at = UserSubscription.query.filter_by(
+            user_id=user_id
+        ).one().started_at
+
+    with patch('routes.payment.verify_payment_signature', return_value=True):
+        replayed = client.post('/payment/verify', json=verification_payload)
+
+    assert replayed.status_code == 200
+    with app.app_context():
+        payment = Payment.query.filter_by(
+            razorpay_order_id='order_test_pro'
+        ).one()
+        subscription = UserSubscription.query.filter_by(user_id=user_id).one()
+        assert payment.status == 'success'
+        assert subscription.plan == 'pro'
+        assert subscription.started_at == started_at
 
 
 def run_tests():

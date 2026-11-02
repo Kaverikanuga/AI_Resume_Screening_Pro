@@ -210,11 +210,11 @@ Copy `.env.example` → `.env`:
 
 | Variable | Required | Description |
 |---|---|---|
-| `SECRET_KEY` | ✅ | Long random string; sessions/CSRF signing. **Must change in production.** |
-| `DATABASE_URL` | – | Defaults to `sqlite:///resume_screening.db`. Use `postgresql://…` in production. |
+| `SECRET_KEY` | ✅ production | Private random string of at least 32 characters for sessions/CSRF. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"`; never commit it. |
+| `DATABASE_URL` | ✅ production | Defaults to SQLite for local development. Use the private PostgreSQL connection URL in production. |
 | `FLASK_ENV` | – | `development` (default) or `production`. |
-| `ADMIN_EMAILS` | – | Comma-separated email addresses authorized for trusted CLI admin bootstrapping. This setting alone never grants application privileges. |
-| `ADMIN_BOOTSTRAP_TOKEN` | For admin management | Random server-side secret of at least 32 characters, required interactively by bootstrap, grant, and revoke CLI commands. Keep it private and rotate it if exposed. |
+| `ADMIN_EMAILS` | For admin management | Comma-separated addresses authorized for trusted CLI admin bootstrapping. The example allowlists `kanugukaveri.31@gmail.com`; allowlisting alone never grants application privileges. |
+| `ADMIN_BOOTSTRAP_TOKEN` | For admin management | Private random secret of at least 32 characters, required interactively by administrator CLI commands. Keep it out of source control and rotate it after use. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | For payments | Test-mode keys from the Razorpay dashboard. Empty ⇒ checkout returns a friendly "not configured" message. |
 | `RAZORPAY_WEBHOOK_SECRET` | For webhooks | Webhook secret from the Razorpay dashboard. |
 | `MAIL_SERVER` / `MAIL_PORT` / `MAIL_USE_TLS` | – | SMTP settings (defaults: Gmail :587 TLS). |
@@ -226,10 +226,72 @@ Copy `.env.example` → `.env`:
 ## Database Setup
 
 - **Dev:** SQLite is created automatically at first start (`db.create_all()` + idempotent performance indexes). Delete `resume_screening.db` to reset.
-- **Schema changes:** this project currently uses `create_all()` (creates missing tables). For destructive changes on an existing database, migrate manually or adopt Flask-Migrate (see Roadmap).
+- **Schema changes:** startup creates missing tables and safely adds the legacy `role` / `is_admin` columns and performance indexes without replacing existing user data. Other schema changes require a reviewed migration; `create_all()` does not alter existing tables.
 - **Production:** point `DATABASE_URL` at PostgreSQL; the app normalizes legacy `postgres://` URIs automatically.
-- **Initial admin:** generate a random token (for example, `python -c "import secrets; print(secrets.token_urlsafe(32))"`), set it as `ADMIN_BOOTSTRAP_TOKEN` and set the intended address in `ADMIN_EMAILS` using the service's private Environment settings. In a trusted deployment shell, run `flask --app app:create_app bootstrap-admin admin@example.com "Admin Name"`. The CLI prompts without echo for the owner token and a new password. It can securely claim an account previously registered with that address by replacing its password; old sessions are invalidated. An email address or registration alone never grants privileges; application authorization checks stored admin state, including the legacy `role=admin` field.
+- **Initial Super Admin (no Render Shell required):** ensure the account has registered, then follow the PowerShell steps in [Provision the Super Admin from outside Render](#provision-the-super-admin-from-outside-render). The purpose-specific `bootstrap-super-admin` command requires the configured owner token and server-side email allowlist, can only promote `kanugukaveri.31@gmail.com`, changes no password or subscription, and writes the role to the existing PostgreSQL database. Run it from your computer against the database's TLS-protected external URL. Render provides separate internal and external URLs in the Postgres dashboard's **Connect** menu; the internal URL is only reachable by services on Render's private network. The command can be run again safely.
 - **Existing account:** `flask --app app:create_app grant-admin admin@example.com` also requires the owner token, an allowlisted address, and a new password; it invalidates existing sessions. `flask --app app:create_app revoke-admin admin@example.com` requires the token as well. These commands are trusted-shell operations. Never expose role or admin fields through user-editable forms or APIs.
+
+### Provision the Super Admin from outside Render
+
+This one-time operation connects directly from your Windows computer to the existing Render Postgres database. It does **not** require Render Shell, an upgraded Render plan, a new service, or a redeploy. Render documents external database connections under [Connect to your Render Postgres database](https://render.com/docs/postgresql-creating-connecting#connect-to-your-database): find the **External Database URL** in the database's **Connect** menu. External connections require TLS.
+
+1. Make sure the updated application containing `bootstrap-super-admin` has been deployed using the normal Git-based deployment. In the Render Dashboard, open your Web Service's **Environment** settings. Set `ADMIN_EMAILS` to exactly `kanugukaveri.31@gmail.com` and `ADMIN_BOOTSTRAP_TOKEN` to a new, private random value of at least 32 characters. Save the settings and wait for the service to finish its normal redeploy. Keep the token out of Git, chat, shell history, screenshots, and logs.
+2. Ensure `kanugukaveri.31@gmail.com` has an existing account in the deployed app. Open the Render Postgres database's **Connect** menu and copy its **External Database URL**, not its internal URL. Do not share or commit this URL. If external access is restricted, temporarily allow only your computer's current public IP in the database's **Info** → **Networking** settings; restore the previous access policy immediately after the command finishes.
+3. Open a new PowerShell window in the updated project directory, with its Python dependencies installed, and run the following. Both sensitive values are entered through hidden prompts, held only in this PowerShell process, and removed from its environment afterward. The database URL has `sslmode=require` appended automatically if needed.
+
+   ```powershell
+   function Set-SecretEnvironmentVariable {
+     param([string]$Name, [string]$Prompt)
+     $secret = Read-Host -Prompt $Prompt -AsSecureString
+     $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+     try {
+       [Environment]::SetEnvironmentVariable(
+         $Name,
+         [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer),
+         'Process'
+       )
+     } finally {
+       [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+       $secret.Dispose()
+     }
+   }
+
+   try {
+     $env:FLASK_ENV = 'production'
+     $env:ADMIN_EMAILS = 'kanugukaveri.31@gmail.com'
+     Set-SecretEnvironmentVariable 'DATABASE_URL' 'Render External Database URL'
+     Set-SecretEnvironmentVariable 'ADMIN_BOOTSTRAP_TOKEN' 'Admin bootstrap token'
+
+     if ($env:DATABASE_URL -notmatch '[?&]sslmode=') {
+       $separator = if ($env:DATABASE_URL.Contains('?')) { '&' } else { '?' }
+       $env:DATABASE_URL += $separator + 'sslmode=require'
+     }
+
+     $bytes = New-Object byte[] 48
+     $random = [Security.Cryptography.RandomNumberGenerator]::Create()
+     try {
+       $random.GetBytes($bytes)
+       $env:SECRET_KEY = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+     } finally {
+       $random.Dispose()
+     }
+
+     python -m flask --app app:create_app bootstrap-super-admin
+     if ($LASTEXITCODE -ne 0) {
+       throw 'Super Admin bootstrap failed. Correct the reported configuration and retry.'
+     }
+   } finally {
+     'DATABASE_URL', 'ADMIN_BOOTSTRAP_TOKEN', 'SECRET_KEY', 'ADMIN_EMAILS',
+       'FLASK_ENV' | ForEach-Object {
+         Remove-Item "Env:$_" -ErrorAction SilentlyContinue
+       }
+   }
+   ```
+
+4. When prompted, enter the same bootstrap token configured in Render. The prompt does not display the token. On success, sign in with the account's existing password; the command does not change it. Admin access and all existing PRO-gated features are authorized from the persisted database role.
+5. After success, remove `ADMIN_BOOTSTRAP_TOKEN` from the Render Web Service's Environment settings and restore any temporary database networking change. Keep `ADMIN_EMAILS` restricted to the designated address. The bootstrap command cannot promote any other address, even if passed an alternate target.
+
+If the command reports the account is missing, register that address in the application first. If PostgreSQL refuses the connection, verify that you used the dashboard's external URL and that outbound connections on port 5432 are permitted on your network. Do not enable a public admin endpoint or disable TLS.
 
 ---
 
@@ -377,13 +439,14 @@ Security properties: constant-time signature comparison, plan/amount always sour
 
 ## Deployment Guide
 
-1. Provision a host (Render/Railway/EC2…) with Python 3.10+.
-2. Set env vars from the table above (**production `SECRET_KEY`**, `FLASK_ENV=production`, Postgres `DATABASE_URL`, Razorpay live keys, SMTP creds).
-3. `pip install -r requirements.txt && python -m spacy download en_core_web_sm`.
-4. Start with Gunicorn: `gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2`.
+1. Provision a Render Web Service and a PostgreSQL database; use the database's private internal connection URL.
+2. Set `FLASK_ENV=production`, a privately generated `SECRET_KEY` (at least 32 characters), and the PostgreSQL `DATABASE_URL`. Add Razorpay and SMTP settings when those integrations are enabled; never put secrets in source control.
+3. Use `pip install -r requirements.txt` as the build command.
+4. Start with `gunicorn wsgi:app --workers 2 --bind 0.0.0.0:$PORT`; the service binds to Render's assigned port. Startup fails explicitly if the production key or PostgreSQL URL is missing or invalid.
 5. Put HTTPS in front (session cookies become Secure automatically in production config).
 6. In the Razorpay dashboard, add a webhook pointing to `https://<your-domain>/payment/webhook` subscribed to `payment.captured`, `payment.authorized`, `payment.failed`; copy the webhook secret into `RAZORPAY_WEBHOOK_SECRET`.
-7. Optional: serve `static/` via CDN/nginx; mount `uploads/` and `reports/` on persistent storage.
+7. Provision `kanugukaveri.31@gmail.com` using [the external-database bootstrap](#provision-the-super-admin-from-outside-render); Render Shell access is not required.
+8. Optional: serve `static/` via CDN/nginx; mount `uploads/` and `reports/` on persistent storage.
 
 ---
 
