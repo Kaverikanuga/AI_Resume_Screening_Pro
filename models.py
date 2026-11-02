@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+import hmac
+
+from flask import current_app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import Index
@@ -8,7 +11,19 @@ import json
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    user_id_value, separator, session_token = str(user_id).partition(':')
+    try:
+        user = User.query.get(int(user_id_value))
+    except (TypeError, ValueError):
+        return None
+
+    if user is None:
+        return None
+    if not separator:
+        return None if user.is_admin else user
+    if not user.is_admin:
+        return None
+    return user if hmac.compare_digest(user.get_id(), str(user_id)) else None
 
 
 class User(UserMixin, db.Model):
@@ -48,8 +63,22 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    def get_id(self):
+        user_id = str(self.id)
+        if not self.is_admin:
+            return user_id
+
+        secret_key = current_app.secret_key
+        if isinstance(secret_key, str):
+            secret_key = secret_key.encode()
+        token = hmac.digest(secret_key, self.password_hash.encode(), 'sha256').hex()
+        return f'{user_id}:{token}'
+
     def check_is_admin(self):
-        return bool(self.is_admin or (self.role and str(self.role).strip().lower() == 'admin'))
+        return bool(
+            self.is_admin
+            or (self.role and str(self.role).strip().casefold() == 'admin')
+        )
 
     def get_plan(self):
         if self.subscription and self.subscription.is_active():

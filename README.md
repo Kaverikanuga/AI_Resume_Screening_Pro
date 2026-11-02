@@ -213,6 +213,8 @@ Copy `.env.example` → `.env`:
 | `SECRET_KEY` | ✅ | Long random string; sessions/CSRF signing. **Must change in production.** |
 | `DATABASE_URL` | – | Defaults to `sqlite:///resume_screening.db`. Use `postgresql://…` in production. |
 | `FLASK_ENV` | – | `development` (default) or `production`. |
+| `ADMIN_EMAILS` | – | Comma-separated email addresses authorized for trusted CLI admin bootstrapping. This setting alone never grants application privileges. |
+| `ADMIN_BOOTSTRAP_TOKEN` | For admin management | Random server-side secret of at least 32 characters, required interactively by bootstrap, grant, and revoke CLI commands. Keep it private and rotate it if exposed. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | For payments | Test-mode keys from the Razorpay dashboard. Empty ⇒ checkout returns a friendly "not configured" message. |
 | `RAZORPAY_WEBHOOK_SECRET` | For webhooks | Webhook secret from the Razorpay dashboard. |
 | `MAIL_SERVER` / `MAIL_PORT` / `MAIL_USE_TLS` | – | SMTP settings (defaults: Gmail :587 TLS). |
@@ -226,6 +228,8 @@ Copy `.env.example` → `.env`:
 - **Dev:** SQLite is created automatically at first start (`db.create_all()` + idempotent performance indexes). Delete `resume_screening.db` to reset.
 - **Schema changes:** this project currently uses `create_all()` (creates missing tables). For destructive changes on an existing database, migrate manually or adopt Flask-Migrate (see Roadmap).
 - **Production:** point `DATABASE_URL` at PostgreSQL; the app normalizes legacy `postgres://` URIs automatically.
+- **Initial admin:** generate a random token (for example, `python -c "import secrets; print(secrets.token_urlsafe(32))"`), set it as `ADMIN_BOOTSTRAP_TOKEN` and set the intended address in `ADMIN_EMAILS` using the service's private Environment settings. In a trusted deployment shell, run `flask --app app:create_app bootstrap-admin admin@example.com "Admin Name"`. The CLI prompts without echo for the owner token and a new password. It can securely claim an account previously registered with that address by replacing its password; old sessions are invalidated. An email address or registration alone never grants privileges; application authorization checks stored admin state, including the legacy `role=admin` field.
+- **Existing account:** `flask --app app:create_app grant-admin admin@example.com` also requires the owner token, an allowlisted address, and a new password; it invalidates existing sessions. `flask --app app:create_app revoke-admin admin@example.com` requires the token as well. These commands are trusted-shell operations. Never expose role or admin fields through user-editable forms or APIs.
 
 ---
 

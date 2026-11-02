@@ -3,17 +3,14 @@ AI Resume Screening Pro - Flask Application Factory
 """
 import os
 import logging
+import hmac
 from datetime import datetime, timezone
 
 from flask import Flask, render_template, jsonify, request
 from sqlalchemy import text
-from dotenv import load_dotenv
 
 from config import config_map
 from extensions import db, login_manager, csrf, mail
-
-# Load environment variables
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +28,8 @@ def create_app(config_name: str = None) -> Flask:
 
     app = Flask(__name__)
     app.config.from_object(config_map[config_name])
+    if config_name == 'production':
+        _validate_production_configuration(app.config)
 
     # Ensure required directories exist
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
@@ -107,19 +106,113 @@ def create_app(config_name: str = None) -> Flask:
 def _register_admin_cli_commands(app: Flask) -> None:
     """Register CLI commands to manage administrators securely via terminal."""
     import click
+    from sqlalchemy.exc import IntegrityError
+
+    def authorize_admin_operation() -> None:
+        expected_token = os.environ.get('ADMIN_BOOTSTRAP_TOKEN', '')
+        if len(expected_token) < 32:
+            raise click.ClickException(
+                'Set ADMIN_BOOTSTRAP_TOKEN to a random secret of at least 32 characters.'
+            )
+        provided_token = click.prompt(
+            'Admin authorization token',
+            hide_input=True,
+        )
+        if not hmac.compare_digest(
+            provided_token.encode('utf-8'),
+            expected_token.encode('utf-8'),
+        ):
+            raise click.ClickException('Admin authorization failed.')
+
+    def require_allowlisted_email(email: str) -> str:
+        email_clean = email.strip().casefold()
+        configured_admin_emails = {
+            entry.strip().casefold()
+            for entry in os.environ.get('ADMIN_EMAILS', '').split(',')
+            if entry.strip()
+        }
+        if email_clean not in configured_admin_emails:
+            raise click.ClickException(
+                'The email must be listed in the server-side ADMIN_EMAILS setting.'
+            )
+        return email_clean
+
+    def prompt_admin_password() -> str:
+        password = click.prompt(
+            'Admin password',
+            hide_input=True,
+            confirmation_prompt=True,
+        )
+        if len(password) < 8:
+            raise click.ClickException('Password must be at least 8 characters.')
+        return password
+
+    @app.cli.command('bootstrap-admin')
+    @click.argument('email')
+    @click.argument('name')
+    def bootstrap_admin(email: str, name: str):
+        """Create or securely claim an admin account using owner credentials."""
+        authorize_admin_operation()
+        email_clean = require_allowlisted_email(email)
+
+        name_clean = name.strip()
+        if not name_clean or len(name_clean) > 150:
+            raise click.ClickException('Name must contain 1 to 150 characters.')
+        password = prompt_admin_password()
+
+        with app.app_context():
+            from models import User, UserSubscription
+
+            user = User.query.filter(
+                db.func.lower(User.email) == email_clean
+            ).first()
+            if user is None:
+                user = User(name=name_clean, email=email_clean)
+                db.session.add(user)
+            user.name = name_clean
+            user.set_password(password)
+            user.is_active = True
+            user.is_admin = True
+            user.role = 'admin'
+            try:
+                db.session.flush()
+                if user.subscription is None:
+                    db.session.add(UserSubscription(
+                        user_id=user.id,
+                        plan='free',
+                        status='active',
+                        started_at=datetime.now(timezone.utc),
+                    ))
+                db.session.commit()
+            except IntegrityError as exc:
+                db.session.rollback()
+                raise click.ClickException(
+                    'The administrator account could not be provisioned.'
+                ) from exc
+
+            click.echo(
+                f"Success: Configured administrator '{email_clean}' provisioned "
+                f"(User ID: {user.id})."
+            )
 
     @app.cli.command('grant-admin')
     @click.argument('email')
     def grant_admin(email: str):
-        """Securely grant administrator privileges to a registered user account."""
-        email_clean = email.strip().lower()
+        """Grant admin using the owner token and reset the account password."""
+        authorize_admin_operation()
+        email_clean = require_allowlisted_email(email)
+        password = prompt_admin_password()
         with app.app_context():
             from models import User
-            user = User.query.filter_by(email=email_clean).first()
+            user = User.query.filter(
+                db.func.lower(User.email) == email_clean
+            ).first()
             if not user:
-                click.echo(f"Error: User with email '{email_clean}' not found in the database.")
-                click.echo("Please register the user first via the web interface (/register), then run this command.")
-                return
+                raise click.ClickException(
+                    'No account exists for this address; use bootstrap-admin instead.'
+                )
+            user.set_password(password)
+            user.is_active = True
             user.is_admin = True
             user.role = 'admin'
             db.session.commit()
@@ -128,7 +221,8 @@ def _register_admin_cli_commands(app: Flask) -> None:
     @app.cli.command('revoke-admin')
     @click.argument('email')
     def revoke_admin(email: str):
-        """Revoke administrator privileges from a user account."""
+        """Revoke administrator privileges using the owner authorization token."""
+        authorize_admin_operation()
         email_clean = email.strip().lower()
         with app.app_context():
             from models import User
@@ -140,6 +234,22 @@ def _register_admin_cli_commands(app: Flask) -> None:
             user.role = 'user'
             db.session.commit()
             click.echo(f"Success: Administrator privileges revoked from '{email_clean}'.")
+
+
+def _validate_production_configuration(app_config) -> None:
+    secret_key = app_config.get('SECRET_KEY')
+    if not isinstance(secret_key, str) or len(secret_key) < 32:
+        raise RuntimeError(
+            'Production requires a private SECRET_KEY containing at least 32 characters.'
+        )
+
+    database_uri = app_config.get('SQLALCHEMY_DATABASE_URI')
+    if not isinstance(database_uri, str) or not database_uri.lower().startswith(
+        ('postgresql://', 'postgresql+')
+    ):
+        raise RuntimeError(
+            'Production requires DATABASE_URL to reference a persistent PostgreSQL database.'
+        )
 
 
 def _ensure_performance_indexes(app: Flask) -> None:

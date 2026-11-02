@@ -24,17 +24,13 @@ FREE_LIMITS = {
 
 def _is_admin_user(user) -> bool:
     """Check if the given user object is an authenticated administrator."""
-    if not user:
+    if not user or not getattr(user, 'is_authenticated', False):
         return False
-    if hasattr(user, 'is_authenticated') and not user.is_authenticated:
-        return False
-    check_is_admin = getattr(user, 'check_is_admin', None)
-    method_says_admin = bool(check_is_admin()) if callable(check_is_admin) else False
+
+    is_admin_flag = getattr(user, 'is_admin', False)
     role = getattr(user, 'role', '')
-    return (
-        method_says_admin
-        or bool(getattr(user, 'is_admin', False))
-        or bool(role and str(role).strip().lower() == 'admin')
+    return is_admin_flag is True or (
+        isinstance(role, str) and role.strip().casefold() == 'admin'
     )
 
 

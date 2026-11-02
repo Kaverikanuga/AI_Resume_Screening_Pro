@@ -6,23 +6,29 @@ Rejection Analyzer, free-plan quotas, premium gating, Resume Editor CRUD
 Contact page, FAQ section, report history, safe-redirect guard, and payment
 signature verification primitives.
 
-Run with:  python test_app.py
+Run the pytest admin-access checks with:  python -m pytest test_app.py -v
+Run the full integration suite with:  python test_app.py
 """
 import os
 import hmac
 import hashlib
+import secrets
+from unittest.mock import patch
 
+import pytest
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-from app import create_app
+from app import create_app, _validate_production_configuration
 from extensions import db
 from models import (
     User, Resume, JobMatch, UserSubscription,
     ResumeDoc, GeneratedReport, ContactMessage,
 )
 from services.payment_service import verify_payment_signature, verify_webhook_signature
-from utils import _is_admin_user
+from utils import _is_admin_user, can_run_job_match
+
+TEST_PASSWORD = secrets.token_urlsafe(16)
 
 
 def create_sample_pdf(filepath):
@@ -55,6 +61,446 @@ def create_sample_pdf(filepath):
     c.save()
 
 
+def authenticate_client(client, app, user_id):
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user_session_id = user.get_id()
+    with client.session_transaction() as session:
+        session['_user_id'] = user_session_id
+        session['_fresh'] = True
+
+
+@pytest.fixture
+def app():
+    app = create_app('testing')
+    yield app
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture
+def authenticated_free_user(app):
+    with app.app_context():
+        user = User(name='Pytest User', email='pytest-user@example.com')
+        user.set_password(TEST_PASSWORD)
+        db.session.add(user)
+        db.session.flush()
+
+        subscription = UserSubscription(
+            user_id=user.id,
+            plan='free',
+            status='active',
+        )
+        resume = Resume(
+            user_id=user.id,
+            filename='pytest-resume.pdf',
+            original_filename='pytest-resume.pdf',
+            file_path='pytest-resume.pdf',
+        )
+        resume.set_extracted_data({
+            'name': 'Pytest User',
+            'skills': {'technical': [], 'soft': []},
+        })
+        resume.set_analysis_data({})
+        db.session.add(resume)
+        db.session.flush()
+        job_match = JobMatch(
+            user_id=user.id,
+            resume_id=resume.id,
+            job_title='Test Engineer',
+            job_description='Python Flask SQL experience required for this software engineering role.',
+        )
+        job_match.set_match_data({'decision': 'RECOMMENDED', 'overall_match': 80})
+        db.session.add_all([subscription, resume, job_match])
+        db.session.commit()
+        user_id = user.id
+        resume_id = resume.id
+        job_match_id = job_match.id
+
+    client = app.test_client()
+    authenticate_client(client, app, user_id)
+    return client, user_id, resume_id, job_match_id
+
+
+@pytest.mark.parametrize(
+    ('is_admin', 'role', 'expected'),
+    [
+        (True, 'user', True),
+        (False, 'admin', True),
+        (False, 'user', False),
+    ],
+    ids=['admin-flag', 'admin-role', 'ordinary-user'],
+)
+def test_admin_identification_accepts_supported_stored_markers(is_admin, role, expected):
+    class AdminMarkers:
+        is_authenticated = True
+
+        def __init__(self):
+            self.is_admin = is_admin
+            self.role = role
+
+        def check_is_admin(self):
+            return False
+
+    assert _is_admin_user(AdminMarkers()) is expected
+
+
+@pytest.mark.parametrize(
+    ('route_template', 'expected_content'),
+    [
+        ('/linkedin/{resume_id}', b'LinkedIn'),
+        ('/naukri/{resume_id}', b'Naukri'),
+        ('/career/{resume_id}', b'Career Guidance for'),
+        ('/rejection-analysis/{match_id}', b'AI Screening-Based Rejection Reasons'),
+        ('/resume-builder', b'ATS-OPTIMIZED RESUME BUILDER'),
+        ('/resume-editor/{resume_id}', b'Edit Extracted Resume Details'),
+    ],
+    ids=['linkedin', 'naukri', 'career', 'rejection-analysis', 'resume-builder', 'resume-editor'],
+)
+@pytest.mark.parametrize(
+    ('is_admin', 'role'),
+    [(True, 'user'), (False, 'admin')],
+    ids=['admin-flag', 'admin-role'],
+)
+def test_free_admin_can_access_authorized_features(
+    app, authenticated_free_user, route_template, expected_content, is_admin, role
+):
+    client, user_id, resume_id, match_id = authenticated_free_user
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.is_admin = is_admin
+        user.role = role
+        db.session.commit()
+        assert user.get_plan() == 'free'
+        assert _is_admin_user(user) is True
+
+    authenticate_client(client, app, user_id)
+    response = client.get(route_template.format(
+        resume_id=resume_id,
+        match_id=match_id,
+    ))
+    assert response.status_code == 200
+    assert expected_content in response.data
+    assert b'Premium Feature' not in response.data
+    assert b'Requires PRO' not in response.data
+
+
+def test_free_admin_can_generate_owned_pdf_reports(app, authenticated_free_user):
+    client, user_id, resume_id, match_id = authenticated_free_user
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.is_admin = True
+        user.role = 'admin'
+        db.session.commit()
+
+    authenticate_client(client, app, user_id)
+    for route in (
+        f'/reports/{resume_id}/download',
+        f'/rejection-analysis/{match_id}/download',
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert response.content_type.startswith('application/pdf')
+
+
+def test_free_admin_job_matches_exceed_free_quota(app, authenticated_free_user):
+    client, user_id, resume_id, _ = authenticated_free_user
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.is_admin = True
+        user.role = 'admin'
+        db.session.commit()
+        assert can_run_job_match(user) == (True, None)
+
+    authenticate_client(client, app, user_id)
+    payload = {
+        'resume_id': str(resume_id),
+        'job_title': 'Senior Test Engineer',
+        'company': 'Test Company',
+        'job_description': (
+            'Python Flask SQL experience required for this software engineering role.'
+        ),
+    }
+    match_result = {'decision': 'RECOMMENDED', 'overall_match': 80}
+    with patch('routes.scanner.match_resume_to_job', return_value=match_result):
+        for _ in range(2):
+            response = client.post('/job-match', data=payload)
+            assert response.status_code == 302
+            assert '/job-match/result/' in response.location
+
+    with app.app_context():
+        assert JobMatch.query.filter_by(user_id=user_id).count() == 3
+
+
+def test_admin_access_does_not_bypass_resume_or_report_ownership(
+    app, authenticated_free_user
+):
+    client, user_id, _, _ = authenticated_free_user
+    with app.app_context():
+        owner = db.session.get(User, user_id)
+        owner.is_admin = True
+        owner.role = 'admin'
+        other_user = User(name='Other User', email='other-user@example.com')
+        other_user.set_password(TEST_PASSWORD)
+        db.session.add(other_user)
+        db.session.flush()
+        other_resume = Resume(
+            user_id=other_user.id,
+            filename='other-resume.pdf',
+            original_filename='other-resume.pdf',
+            file_path='other-resume.pdf',
+        )
+        other_resume.set_extracted_data({'name': 'Other User'})
+        other_resume.set_analysis_data({})
+        db.session.add(other_resume)
+        db.session.flush()
+        other_match = JobMatch(
+            user_id=other_user.id,
+            resume_id=other_resume.id,
+            job_title='Private Role',
+            job_description='A private job description for ownership verification.',
+        )
+        other_match.set_match_data({'decision': 'RECOMMENDED', 'overall_match': 80})
+        db.session.add(other_match)
+        db.session.flush()
+        other_report = GeneratedReport(
+            user_id=other_user.id,
+            resume_id=other_resume.id,
+            kind='analysis',
+            filename='private-report.pdf',
+            file_path='not-created.pdf',
+        )
+        db.session.add(other_report)
+        db.session.commit()
+        other_resume_id = other_resume.id
+        other_match_id = other_match.id
+        other_report_id = other_report.id
+
+    authenticate_client(client, app, user_id)
+    denied_routes = [
+        f'/linkedin/{other_resume_id}',
+        f'/naukri/{other_resume_id}',
+        f'/career/{other_resume_id}',
+        f'/analysis/{other_resume_id}',
+        f'/resume-editor/{other_resume_id}',
+        f'/reports/{other_resume_id}/download',
+        f'/rejection-analysis/{other_match_id}',
+        f'/rejection-analysis/{other_match_id}/download',
+        f'/reports/{other_report_id}/file',
+    ]
+    for route in denied_routes:
+        response = client.get(route)
+        assert response.status_code == 302, route
+        assert response.location.endswith('/dashboard') or response.location.endswith('/reports'), route
+
+
+def test_unauthenticated_user_cannot_access_admin_premium_routes(
+    app, authenticated_free_user
+):
+    _, _, resume_id, match_id = authenticated_free_user
+    anonymous_client = app.test_client()
+    for route in (
+        f'/linkedin/{resume_id}',
+        f'/naukri/{resume_id}',
+        f'/career/{resume_id}',
+        f'/rejection-analysis/{match_id}',
+        '/resume-builder',
+        f'/resume-editor/{resume_id}',
+    ):
+        response = anonymous_client.get(route)
+        assert response.status_code == 302, route
+        assert '/login' in response.location
+
+
+def test_admin_bootstrap_claims_pre_registered_account_securely(
+    app, authenticated_free_user
+):
+    client, user_id, resume_id, _ = authenticated_free_user
+    email = 'pytest-user@example.com'
+    runner = app.test_cli_runner()
+    owner_token = secrets.token_urlsafe(32)
+    owner_password = secrets.token_urlsafe(16)
+    invalid_token = secrets.token_urlsafe(32)
+
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': f' {email.upper()} ',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        wrong_token = runner.invoke(
+            args=['bootstrap-admin', email, 'Configured Admin'],
+            input=f'{invalid_token}\n',
+        )
+        assert wrong_token.exit_code != 0
+        assert 'authorization failed' in wrong_token.output
+        assert invalid_token not in wrong_token.output
+
+        unlisted_email = runner.invoke(
+            args=['bootstrap-admin', 'other@example.com', 'Other Admin'],
+            input=f'{owner_token}\n',
+        )
+        assert unlisted_email.exit_code != 0
+        assert 'ADMIN_EMAILS' in unlisted_email.output
+
+        result = runner.invoke(
+            args=['bootstrap-admin', email, 'Configured Admin'],
+            input=f'{owner_token}\n{owner_password}\n{owner_password}\n',
+        )
+        assert result.exit_code == 0, result.output
+        assert owner_token not in result.output
+        assert owner_password not in result.output
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.email == email
+        assert user.is_admin is True
+        assert user.role == 'admin'
+        assert user.get_plan() == 'free'
+        assert user.check_password(owner_password)
+
+    stale_session_response = client.get(f'/linkedin/{resume_id}')
+    assert stale_session_response.status_code == 302
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': TEST_PASSWORD,
+    })
+    assert login_response.status_code == 200
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': owner_password,
+    })
+    assert login_response.status_code == 302
+    for route, expected_content in (
+        (f'/linkedin/{resume_id}', b'LinkedIn'),
+        (f'/naukri/{resume_id}', b'Naukri'),
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert expected_content in response.data
+        assert b'Premium Feature' not in response.data
+
+
+def test_admin_grant_requires_owner_token(app, authenticated_free_user):
+    client, user_id, resume_id, _ = authenticated_free_user
+    owner_token = secrets.token_urlsafe(32)
+    invalid_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': 'pytest-user@example.com',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        result = app.test_cli_runner().invoke(
+            args=['grant-admin', 'pytest-user@example.com'],
+            input=f'{invalid_token}\n',
+        )
+
+    assert result.exit_code != 0
+    assert 'authorization failed' in result.output
+    assert invalid_token not in result.output
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is False
+        assert user.role == 'user'
+    assert b'Premium Feature' in client.get(f'/linkedin/{resume_id}').data
+
+
+@pytest.mark.parametrize(
+    'route_template',
+    [
+        '/linkedin/{resume_id}',
+        '/naukri/{resume_id}',
+        '/career/{resume_id}',
+        '/rejection-analysis/{match_id}',
+        '/reports/{resume_id}/download',
+        '/rejection-analysis/{match_id}/download',
+        '/resume-builder',
+    ],
+    ids=[
+        'linkedin', 'naukri', 'career', 'rejection-analysis', 'reports-pdf',
+        'rejection-pdf', 'resume-builder',
+    ],
+)
+def test_normal_free_user_remains_restricted(
+    app, authenticated_free_user, route_template
+):
+    client, user_id, resume_id, match_id = authenticated_free_user
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.get_plan() == 'free'
+        assert _is_admin_user(user) is False
+
+    response = client.get(route_template.format(
+        resume_id=resume_id,
+        match_id=match_id,
+    ))
+    assert response.status_code == 200
+    assert b'Premium Feature' in response.data
+    assert b'Requires PRO plan or higher' in response.data
+
+
+@pytest.mark.parametrize(
+    'route_template',
+    ['/linkedin/{resume_id}', '/naukri/{resume_id}'],
+    ids=['linkedin', 'naukri'],
+)
+def test_allowlisted_email_does_not_grant_admin_privileges(
+    app, authenticated_free_user, route_template
+):
+    _, _, resume_id, _ = authenticated_free_user
+    email = 'allowlisted-new-user@example.com'
+    client = app.test_client()
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': email,
+        'ADMIN_BOOTSTRAP_TOKEN': secrets.token_urlsafe(32),
+    }):
+        registration = client.post('/register', data={
+            'name': 'Allowlisted New User',
+            'email': email,
+            'password': TEST_PASSWORD,
+            'confirm_password': TEST_PASSWORD,
+        })
+
+    assert registration.status_code == 302
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.is_admin is False
+        assert user.role == 'user'
+        user_id = user.id
+
+    with app.app_context():
+        resume = Resume(
+            user_id=user_id,
+            filename='allowlisted-resume.pdf',
+            original_filename='allowlisted-resume.pdf',
+            file_path='allowlisted-resume.pdf',
+        )
+        resume.set_extracted_data({'name': 'Allowlisted New User'})
+        resume.set_analysis_data({})
+        db.session.add(resume)
+        db.session.commit()
+        resume_id = resume.id
+
+    response = client.get(route_template.format(resume_id=resume_id))
+
+    assert response.status_code == 200
+    assert b'Premium Feature' in response.data
+
+
+def test_production_configuration_requires_private_secret_and_persistent_database():
+    valid_config = {
+        'SECRET_KEY': secrets.token_urlsafe(32),
+        'SQLALCHEMY_DATABASE_URI': 'postgresql://app:private@db.example/app',
+    }
+    _validate_production_configuration(valid_config)
+
+    for invalid_config in (
+        {**valid_config, 'SECRET_KEY': 'short'},
+        {**valid_config, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///temporary.db'},
+        {**valid_config, 'SQLALCHEMY_DATABASE_URI': None},
+    ):
+        with pytest.raises(RuntimeError):
+            _validate_production_configuration(invalid_config)
+
+
 def run_tests():
     app = create_app('testing')
     client = app.test_client()
@@ -85,8 +531,8 @@ def run_tests():
     reg_res = client.post('/register', data={
         'name': 'Test User',
         'email': 'test@example.com',
-        'password': 'Password123',
-        'confirm_password': 'Password123'
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD
     }, follow_redirects=True)
     assert reg_res.status_code == 200, "Registration failed"
     print("[OK] User registered and logged in successfully!")
@@ -95,7 +541,7 @@ def run_tests():
     # A malicious absolute next URL must NOT be followed after login
     evil_login = client.post('/login?next=https://evil.example.com/steal', data={
         'email': 'test@example.com',
-        'password': 'Password123'
+        'password': TEST_PASSWORD
     })
     assert evil_login.status_code == 302, "Expected redirect after login"
     location = evil_login.headers.get('Location', '')
@@ -342,7 +788,7 @@ def run_tests():
         client.get('/logout')
         client.post('/register', data={
             'name': 'Other User', 'email': 'other@example.com',
-            'password': 'Password123', 'confirm_password': 'Password123'
+            'password': TEST_PASSWORD, 'confirm_password': TEST_PASSWORD
         }, follow_redirects=True)
         forbidden_save = client.post(f'/editor/{doc_id}/save', json=payload)
         assert forbidden_save.status_code == 403, "Cross-user editor access not blocked!"
@@ -352,7 +798,7 @@ def run_tests():
         client.get('/logout')
 
         # Log back in as primary user and delete the copy
-        client.post('/login', data={'email': 'test@example.com', 'password': 'Password123'},
+        client.post('/login', data={'email': 'test@example.com', 'password': TEST_PASSWORD},
                     follow_redirects=True)
         with app.app_context():
             copy_doc = ResumeDoc.query.filter(ResumeDoc.title.like('%(Copy)%')).first()
@@ -428,8 +874,8 @@ def run_tests():
     client.post('/register', data={
         'name': 'Admin User',
         'email': 'admin@example.com',
-        'password': 'Password123',
-        'confirm_password': 'Password123'
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD
     }, follow_redirects=True)
 
     with app.app_context():
@@ -441,6 +887,12 @@ def run_tests():
         assert admin_user.get_plan() == 'free'  # Admin has free subscription, no payment made
         assert admin_user.is_pro() is True
         assert admin_user.is_business() is True
+
+    admin_login = client.post('/login', data={
+        'email': 'admin@example.com',
+        'password': TEST_PASSWORD,
+    })
+    assert admin_login.status_code == 302
 
     # 14a. Admin resume uploads beyond free limit (4+ uploads without quota block)
     for k in range(1, 5):
@@ -502,8 +954,8 @@ def run_tests():
     client.post('/register', data={
         'name': 'Standard Free User',
         'email': 'freeuser@example.com',
-        'password': 'Password123',
-        'confirm_password': 'Password123'
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD
     }, follow_redirects=True)
     with app.app_context():
         free_u = User.query.filter_by(email='freeuser@example.com').first()
@@ -529,8 +981,8 @@ def run_tests():
     client.post('/register', data={
         'name': 'Kaveri Kanugu',
         'email': 'kanugukaveri31@gmail.com',
-        'password': 'Password123',
-        'confirm_password': 'Password123'
+        'password': TEST_PASSWORD,
+        'confirm_password': TEST_PASSWORD
     }, follow_redirects=True)
 
     with app.app_context():
@@ -544,11 +996,22 @@ def run_tests():
         assert target_user.is_pro() is False
     print("[OK] User kanugukaveri31@gmail.com not automatically promoted on registration (secure baseline)!")
 
-    # Step 2: Use the secure grant-admin CLI command
+    # Step 2: Use the owner-authorized grant-admin CLI command
     runner = app.test_cli_runner()
-    cli_res = runner.invoke(args=['grant-admin', 'kanugukaveri31@gmail.com'])
+    owner_token = secrets.token_urlsafe(32)
+    owner_password = secrets.token_urlsafe(16)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': 'kanugukaveri31@gmail.com',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        cli_res = runner.invoke(
+            args=['grant-admin', 'kanugukaveri31@gmail.com'],
+            input=f'{owner_token}\n{owner_password}\n{owner_password}\n',
+        )
     assert cli_res.exit_code == 0
     assert "Success" in cli_res.output
+    assert owner_token not in cli_res.output
+    assert owner_password not in cli_res.output
     print("[OK] Secure CLI command 'grant-admin' executed successfully!")
 
     # Step 3: Verify the account now has full admin privileges without purchasing a subscription
@@ -582,10 +1045,13 @@ def run_tests():
             return False
 
     assert _is_admin_user(InconsistentRoleUser()) is True
-    print("[OK] Stored admin role is honored even if check_is_admin() disagrees!")
+    print("[OK] A stored administrator role is recognized for legacy accounts!")
 
     # Step 4: Verify kanugukaveri31@gmail.com has unlimited resume uploads (4+ uploads)
-    client.post('/login', data={'email': 'kanugukaveri31@gmail.com', 'password': 'Password123'}, follow_redirects=True)
+    client.post('/login', data={
+        'email': 'kanugukaveri31@gmail.com',
+        'password': owner_password,
+    }, follow_redirects=True)
     for k in range(1, 5):
         with open(sample_pdf_path, 'rb') as pdf_file:
             up_res = client.post('/scanner', data={
@@ -600,21 +1066,35 @@ def run_tests():
         assert k_resume is not None
         target_user_id = target_user.id
 
-        for is_admin_flag, role in ((True, 'user'), (False, 'admin')):
-            target_user.is_admin = is_admin_flag
-            target_user.role = role
-            db.session.commit()
-            for route in (f'/linkedin/{k_resume.id}', f'/naukri/{k_resume.id}'):
-                marker_res = client.get(route)
-                assert marker_res.status_code == 200, \
-                    f"Admin marker combination is blocked from {route}"
-                assert b"Premium Feature" not in marker_res.data
-                assert b"Requires PRO" not in marker_res.data
-                print(f"[OK] Free-plan admin marker ({role}, {is_admin_flag}) accesses {route}")
+        target_user.is_admin = True
+        target_user.role = 'user'
+        db.session.commit()
+        client.post('/login', data={
+            'email': 'kanugukaveri31@gmail.com',
+            'password': owner_password,
+        })
+        for route in (f'/linkedin/{k_resume.id}', f'/naukri/{k_resume.id}'):
+            marker_res = client.get(route)
+            assert marker_res.status_code == 200, \
+                f"Admin flag is blocked from {route}"
+            assert b"Premium Feature" not in marker_res.data
+            assert b"Requires PRO" not in marker_res.data
+            print(f"[OK] Free-plan admin flag accesses {route}")
 
         target_user = db.session.get(User, target_user_id)
-        target_user.is_admin = True
+        target_user.is_admin = False
         target_user.role = 'admin'
+        db.session.commit()
+        client.post('/login', data={
+            'email': 'kanugukaveri31@gmail.com',
+            'password': owner_password,
+        })
+        for route in (f'/linkedin/{k_resume.id}', f'/naukri/{k_resume.id}'):
+            marker_res = client.get(route)
+            assert b"Premium Feature" not in marker_res.data, \
+                f"Stored admin role was blocked from {route}"
+
+        target_user.is_admin = True
         db.session.commit()
 
         # Step 5: Verify kanugukaveri31@gmail.com has unlimited job matches (3+ matches)
@@ -631,6 +1111,37 @@ def run_tests():
 
         k_match = JobMatch.query.filter_by(user_id=target_user.id).first()
         assert k_match is not None
+
+        target_user.is_admin = False
+        target_user.role = 'user'
+        db.session.commit()
+        client.get('/logout')
+        free_relogin = client.post('/login', data={
+            'email': 'kanugukaveri31@gmail.com',
+            'password': owner_password,
+        })
+        assert free_relogin.status_code == 302
+        assert target_user.get_plan() == 'free'
+        assert target_user.is_pro() is False
+        admin_emails = '  KANUGUKAVERI31@GMAIL.COM , admin@example.com  '
+        with patch.dict(os.environ, {'ADMIN_EMAILS': admin_emails}):
+            assert _is_admin_user(target_user) is False
+            assert target_user.is_pro() is False
+            for route in (f'/linkedin/{k_resume.id}', f'/naukri/{k_resume.id}'):
+                allowlist_res = client.get(route)
+                assert b'Premium Feature' in allowlist_res.data, \
+                    f"Allowlisted email unexpectedly accessed {route}"
+
+        assert target_user.is_admin is False
+        client.get('/logout')
+        target_user.is_admin = True
+        target_user.role = 'admin'
+        db.session.commit()
+        client.post('/login', data={
+            'email': 'kanugukaveri31@gmail.com',
+            'password': owner_password,
+        })
+        print("[OK] ADMIN_EMAILS alone grants no access; explicitly provisioned admins retain Free-plan access!")
 
         # Step 6: Verify full access to all PRO-gated features
         admin_features = [
