@@ -29,9 +29,15 @@ def _is_admin_user(user) -> bool:
 
     is_admin_flag = getattr(user, 'is_admin', False)
     role = getattr(user, 'role', '')
-    return is_admin_flag is True or (
+    if is_admin_flag is True or (
         isinstance(role, str) and role.strip().casefold() == 'admin'
-    )
+    ):
+        return True
+
+    if hasattr(user, 'check_is_admin') and callable(user.check_is_admin):
+        return bool(user.check_is_admin())
+
+    return False
 
 
 def require_plan(min_plan='pro'):
@@ -49,7 +55,7 @@ def require_plan(min_plan='pro'):
                 return redirect(url_for('auth.login', next=request.url))
 
             # Admin bypass: unrestricted access to all features
-            if _is_admin_user(current_user):
+            if _is_admin_user(current_user) or (hasattr(current_user, 'check_is_admin') and current_user.check_is_admin()):
                 return f(*args, **kwargs)
 
             user_plan = current_user.get_plan()

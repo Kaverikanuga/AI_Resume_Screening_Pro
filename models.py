@@ -110,6 +110,15 @@ class User(UserMixin, db.Model):
         return f'<User {self.email}>'
 
 
+class AdminBootstrapClaim(db.Model):
+    """Persistent singleton record preventing repeated web admin provisioning."""
+    __tablename__ = 'admin_bootstrap_claims'
+
+    key = db.Column(db.String(50), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    claimed_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 class Resume(db.Model):
     __tablename__ = 'resumes'
     __table_args__ = (

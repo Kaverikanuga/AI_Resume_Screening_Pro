@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Administrator Setup - AI Resume Screening Pro{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="glass-card glass-card-glow p-4 p-sm-5 mx-auto" style="max-width: 640px;">
+    <div class="text-center mb-4">
+      <div class="badge badge-info mb-2 py-1 px-3">SECURE ACCOUNT SETUP</div>
+      <h2 class="fw-bold">Enable Administrator Access</h2>
+      <p class="text-muted mb-0">This one-time setup applies only to your existing account.</p>
+    </div>
+
+    {% if message %}
+    <div class="alert {{ 'alert-danger' if show_form else 'alert-info' }}" role="status">
+      {{ message }}
+    </div>
+    {% endif %}
+
+    {% if show_form %}
+    <form method="POST" action="{{ url_for('main.provision_admin') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-4">
+        <label for="bootstrap_token" class="form-label text-muted small fw-semibold">
+          Admin setup token
+        </label>
+        <input
+          id="bootstrap_token"
+          name="bootstrap_token"
+          type="password"
+          class="form-control"
+          autocomplete="off"
+          required>
+        <div class="form-text">The token is never displayed or saved in this page.</div>
+      </div>
+      <button type="submit" class="btn btn-gradient w-100 py-3 fw-bold">
+        Enable Admin Access
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

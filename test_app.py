@@ -12,6 +12,7 @@ Run the full integration suite with:  python test_app.py
 import os
 import hmac
 import hashlib
+import re
 import secrets
 from unittest.mock import patch
 
@@ -27,7 +28,7 @@ from app import (
 )
 from extensions import db
 from models import (
-    User, Resume, JobMatch, UserSubscription, Payment,
+    User, Resume, JobMatch, UserSubscription, Payment, AdminBootstrapClaim,
     ResumeDoc, GeneratedReport, ContactMessage,
 )
 from services.payment_service import verify_payment_signature, verify_webhook_signature
@@ -73,6 +74,34 @@ def authenticate_client(client, app, user_id):
     with client.session_transaction() as session:
         session['_user_id'] = user_session_id
         session['_fresh'] = True
+
+
+def create_logged_in_user(app, email):
+    with app.app_context():
+        user = User(name='Provisioning Test User', email=email)
+        user.set_password(TEST_PASSWORD)
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(UserSubscription(
+            user_id=user.id,
+            plan='free',
+            status='active',
+        ))
+        db.session.commit()
+        user_id = user.id
+
+    client = app.test_client()
+    authenticate_client(client, app, user_id)
+    return client, user_id
+
+
+def csrf_token_from(response):
+    match = re.search(
+        rb'<input[^>]*name="csrf_token"[^>]*value="([^"]+)"',
+        response.data,
+    )
+    assert match, 'The form did not include a CSRF token.'
+    return match.group(1).decode()
 
 
 @pytest.fixture
@@ -126,6 +155,199 @@ def authenticated_free_user(app):
     client = app.test_client()
     authenticate_client(client, app, user_id)
     return client, user_id, resume_id, job_match_id
+
+
+def test_web_admin_provisioning_is_authorized_and_preserves_free_account(app):
+    email = 'kanugukaveri.31@gmail.com'
+    client, user_id = create_logged_in_user(app, email)
+    owner_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': email,
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        app.config['WTF_CSRF_ENABLED'] = True
+        form_response = client.get('/admin/provision')
+        assert form_response.status_code == 200
+        assert owner_token.encode() not in form_response.data
+        csrf_token = csrf_token_from(form_response)
+
+        missing_csrf = client.post('/admin/provision', data={
+            'bootstrap_token': owner_token,
+        })
+        assert missing_csrf.status_code == 400
+
+        response = client.post('/admin/provision', data={
+            'csrf_token': csrf_token,
+            'bootstrap_token': owner_token,
+        })
+    assert response.status_code == 302
+    assert owner_token.encode() not in response.data
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is True
+        assert user.role == 'admin'
+        assert user.check_password(TEST_PASSWORD)
+        assert user.get_plan() == 'free'
+        assert user.subscription.plan == 'free'
+        assert user.subscription.status == 'active'
+        assert User.query.filter_by(email=email).count() == 1
+        assert AdminBootstrapClaim.query.count() == 1
+        assert AdminBootstrapClaim.query.one().user_id == user_id
+
+    dashboard = client.get('/dashboard')
+    assert dashboard.status_code == 200
+    assert b'ADMIN' in dashboard.data
+    settings = client.get('/settings')
+    assert settings.status_code == 200
+    assert b'Complete Admin Setup' not in settings.data
+    assert client.get('/resume-builder').status_code == 200
+
+
+def test_web_admin_provisioning_supports_gmail_canonicalization(app):
+    """Verify kanugukaveri31@gmail.com matches ADMIN_EMAILS kanugukaveri.31@gmail.com."""
+    account_email = 'kanugukaveri31@gmail.com'
+    env_email = 'kanugukaveri.31@gmail.com'
+    client, user_id = create_logged_in_user(app, account_email)
+
+    with app.app_context():
+        resume = Resume(
+            user_id=user_id,
+            filename='admin_sample.pdf',
+            original_filename='admin_sample.pdf',
+            file_path='admin_sample.pdf',
+        )
+        resume.set_extracted_data({
+            'name': 'Kaveri Admin',
+            'skills': {'technical': ['Python', 'Flask'], 'soft': ['Leadership']},
+        })
+        resume.set_analysis_data({'overall_score': 85})
+        db.session.add(resume)
+        db.session.flush()
+
+        job_match = JobMatch(
+            user_id=user_id,
+            resume_id=resume.id,
+            job_title='Senior Python Engineer',
+            job_description='Looking for Python Flask SQL expert with cloud experience.',
+        )
+        job_match.set_match_data({'decision': 'RECOMMENDED', 'overall_match': 85})
+        db.session.add(job_match)
+        db.session.commit()
+        resume_id = resume.id
+        match_id = job_match.id
+
+    owner_token = secrets.token_urlsafe(32)
+    # Extra whitespace around token to test trimming
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': f'  {env_email}  ',
+        'ADMIN_BOOTSTRAP_TOKEN': f'  {owner_token}  ',
+    }):
+        form_response = client.get('/admin/provision')
+        assert form_response.status_code == 200
+        csrf_token = csrf_token_from(form_response)
+
+        response = client.post('/admin/provision', data={
+            'csrf_token': csrf_token,
+            'bootstrap_token': f'  {owner_token}  ',
+        })
+        assert response.status_code == 302
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is True
+        assert user.role == 'admin'
+        assert user.get_plan() == 'free'
+        assert user.subscription.plan == 'free'
+
+    # Verify all four target features work without requiring PRO
+    assert client.get('/resume-builder').status_code == 200
+    assert client.get(f'/linkedin/{resume_id}').status_code == 200
+    assert client.get(f'/naukri/{resume_id}').status_code == 200
+    assert client.get(f'/career/{resume_id}').status_code == 200
+
+    # Verify Rejection Analyzer and PDF Reports work without PRO
+    assert client.get(f'/rejection-analysis/{match_id}').status_code == 200
+    rep_pdf = client.get(f'/reports/{resume_id}/download')
+    assert rep_pdf.status_code == 200
+    assert rep_pdf.content_type.startswith('application/pdf')
+
+    for r in (
+        client.get('/resume-builder'),
+        client.get(f'/linkedin/{resume_id}'),
+        client.get(f'/naukri/{resume_id}'),
+        client.get(f'/career/{resume_id}'),
+        client.get(f'/rejection-analysis/{match_id}'),
+    ):
+        assert b'Premium Feature' not in r.data
+        assert b'Requires PRO' not in r.data
+
+
+def test_web_admin_provisioning_rejects_invalid_token_without_consuming_claim(app):
+    email = 'kanugukaveri.31@gmail.com'
+    client, user_id = create_logged_in_user(app, email)
+    invalid_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': email,
+        'ADMIN_BOOTSTRAP_TOKEN': secrets.token_urlsafe(32),
+    }):
+        response = client.post('/admin/provision', data={
+            'bootstrap_token': invalid_token,
+        })
+
+    assert response.status_code == 403
+    assert invalid_token.encode() not in response.data
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is False
+        assert user.role == 'user'
+        assert AdminBootstrapClaim.query.count() == 0
+
+
+def test_web_admin_provisioning_requires_exact_allowlisted_account(app):
+    client, user_id = create_logged_in_user(app, 'ordinary@example.com')
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': 'kanugukaveri.31@gmail.com',
+        'ADMIN_BOOTSTRAP_TOKEN': secrets.token_urlsafe(32),
+    }):
+        response = client.get('/admin/provision')
+
+    assert response.status_code == 403
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.is_admin is False
+        assert user.role == 'user'
+        assert AdminBootstrapClaim.query.count() == 0
+
+
+def test_web_admin_provisioning_cannot_be_repeated_for_another_allowlisted_user(app):
+    email = 'kanugukaveri.31@gmail.com'
+    first_client, first_user_id = create_logged_in_user(app, email)
+    second_client, second_user_id = create_logged_in_user(app, 'second-admin@example.com')
+    owner_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': f'{email},second-admin@example.com',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        first_response = first_client.post('/admin/provision', data={
+            'bootstrap_token': owner_token,
+        })
+        assert first_response.status_code == 302
+        repeated_response = second_client.post('/admin/provision', data={
+            'bootstrap_token': owner_token,
+        })
+
+    assert repeated_response.status_code == 409
+    assert owner_token.encode() not in repeated_response.data
+    with app.app_context():
+        first_user = db.session.get(User, first_user_id)
+        second_user = db.session.get(User, second_user_id)
+        assert first_user.is_admin is True
+        assert first_user.role == 'admin'
+        assert second_user.is_admin is False
+        assert second_user.role == 'user'
+        assert second_user.get_plan() == 'free'
+        assert AdminBootstrapClaim.query.count() == 1
 
 
 @pytest.mark.parametrize(
@@ -207,6 +429,156 @@ def test_free_admin_can_generate_owned_pdf_reports(app, authenticated_free_user)
         response = client.get(route)
         assert response.status_code == 200
         assert response.content_type.startswith('application/pdf')
+
+
+def test_free_admin_feature_posts_and_login_persistence(app):
+    email = 'kanugukaveri.31@gmail.com'
+    password = secrets.token_urlsafe(16)
+    with app.app_context():
+        user = User(name='Kaveri Admin', email=f' {email.upper()} ')
+        user.set_password(password)
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(UserSubscription(
+            user_id=user.id,
+            plan='free',
+            status='active',
+        ))
+        resume = Resume(
+            user_id=user.id,
+            filename='admin-resume.pdf',
+            original_filename='admin-resume.pdf',
+            file_path='admin-resume.pdf',
+        )
+        resume.set_extracted_data({
+            'name': 'Kaveri Admin',
+            'skills': {'technical': ['Python'], 'soft': []},
+        })
+        resume.set_analysis_data({})
+        db.session.add(resume)
+        db.session.commit()
+        user_id = user.id
+        resume_id = resume.id
+        password_hash = user.password_hash
+
+    owner_token = secrets.token_urlsafe(32)
+    with patch.dict(os.environ, {
+        'ADMIN_EMAILS': f' {email.upper()} ',
+        'ADMIN_BOOTSTRAP_TOKEN': owner_token,
+    }):
+        result = app.test_cli_runner().invoke(
+            args=['bootstrap-super-admin'],
+            input=f'{owner_token}\n',
+        )
+    assert result.exit_code == 0, result.output
+    assert owner_token not in result.output
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.email == email
+        assert user.password_hash == password_hash
+        assert user.is_admin is True
+        assert user.role == 'admin'
+        assert user.get_plan() == 'free'
+
+    client = app.test_client()
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': password,
+    })
+    assert login_response.status_code == 302
+
+    feature_responses = [
+        client.get('/resume-builder'),
+        client.get(f'/linkedin/{resume_id}'),
+        client.get(f'/naukri/{resume_id}'),
+        client.get(f'/career/{resume_id}'),
+        client.post(f'/career/{resume_id}', data={
+            'target_role': 'Data Scientist',
+        }),
+        client.post('/resume-builder', data={
+            'full_name': 'Kaveri Admin',
+            'email': email,
+            'phone': '',
+            'location': '',
+            'linkedin': '',
+            'github': '',
+            'summary': 'Experienced software professional.',
+            'skills': 'Python, SQL',
+            'template': 'ats',
+        }),
+    ]
+    for response in feature_responses:
+        assert response.status_code == 200
+        assert b'Premium Feature' not in response.data
+        assert b'Requires PRO' not in response.data
+        assert b'ADMIN' in response.data
+
+    logout_response = client.get('/logout')
+    assert logout_response.status_code == 302
+    login_response = client.post('/login', data={
+        'email': email,
+        'password': password,
+    })
+    assert login_response.status_code == 302
+    dashboard = client.get('/dashboard')
+    assert dashboard.status_code == 200
+    assert b'ADMIN' in dashboard.data
+    for route in (
+        '/resume-builder',
+        f'/linkedin/{resume_id}',
+        f'/naukri/{resume_id}',
+        f'/career/{resume_id}',
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert b'Premium Feature' not in response.data
+
+
+def test_pro_user_retains_access_to_all_four_premium_features(
+    app, authenticated_free_user
+):
+    client, user_id, resume_id, _ = authenticated_free_user
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.subscription.plan = 'pro'
+        user.subscription.status = 'active'
+        db.session.commit()
+
+    for route in (
+        '/resume-builder',
+        f'/linkedin/{resume_id}',
+        f'/naukri/{resume_id}',
+        f'/career/{resume_id}',
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert b'Premium Feature' not in response.data
+
+
+def test_normal_free_user_cannot_submit_premium_feature_forms(
+    authenticated_free_user
+):
+    client, _, resume_id, _ = authenticated_free_user
+    career_response = client.post(f'/career/{resume_id}', data={
+        'target_role': 'Data Scientist',
+    })
+    builder_response = client.post('/resume-builder', data={
+        'full_name': 'Pytest User',
+        'email': 'pytest-user@example.com',
+        'phone': '',
+        'location': '',
+        'linkedin': '',
+        'github': '',
+        'summary': '',
+        'skills': 'Python',
+        'template': 'modern',
+    })
+
+    for response in (career_response, builder_response):
+        assert response.status_code == 200
+        assert b'Premium Feature' in response.data
+        assert b'Requires PRO plan or higher' in response.data
 
 
 def test_free_admin_job_matches_exceed_free_quota(app, authenticated_free_user):

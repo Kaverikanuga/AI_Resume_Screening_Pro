@@ -139,6 +139,19 @@ def _register_admin_cli_commands(app: Flask) -> None:
             )
         return email_clean
 
+    def find_user_by_normalized_email(email: str):
+        from models import User
+
+        matches = User.query.filter(
+            db.func.lower(db.func.trim(User.email)) == email
+        ).limit(2).all()
+        if len(matches) > 1:
+            raise click.ClickException(
+                'Multiple accounts match this normalized email. Resolve the duplicate '
+                'database records before changing administrator access.'
+            )
+        return matches[0] if matches else None
+
     def prompt_admin_password() -> str:
         password = click.prompt(
             'Admin password',
@@ -156,16 +169,13 @@ def _register_admin_cli_commands(app: Flask) -> None:
         email_clean = require_allowlisted_email(SUPER_ADMIN_EMAIL)
 
         with app.app_context():
-            from models import User
-
-            user = User.query.filter(
-                db.func.lower(User.email) == email_clean
-            ).first()
+            user = find_user_by_normalized_email(email_clean)
             if user is None:
                 raise click.ClickException(
                     'The designated account must register before Super Admin access can be granted.'
                 )
 
+            user.email = email_clean
             user.is_admin = True
             user.role = 'admin'
             try:
@@ -195,13 +205,12 @@ def _register_admin_cli_commands(app: Flask) -> None:
         with app.app_context():
             from models import User, UserSubscription
 
-            user = User.query.filter(
-                db.func.lower(User.email) == email_clean
-            ).first()
+            user = find_user_by_normalized_email(email_clean)
             if user is None:
                 user = User(name=name_clean, email=email_clean)
                 db.session.add(user)
             user.name = name_clean
+            user.email = email_clean
             user.set_password(password)
             user.is_active = True
             user.is_admin = True
@@ -235,14 +244,12 @@ def _register_admin_cli_commands(app: Flask) -> None:
         email_clean = require_allowlisted_email(email)
         password = prompt_admin_password()
         with app.app_context():
-            from models import User
-            user = User.query.filter(
-                db.func.lower(User.email) == email_clean
-            ).first()
+            user = find_user_by_normalized_email(email_clean)
             if not user:
                 raise click.ClickException(
                     'No account exists for this address; use bootstrap-admin instead.'
                 )
+            user.email = email_clean
             user.set_password(password)
             user.is_active = True
             user.is_admin = True
@@ -257,11 +264,11 @@ def _register_admin_cli_commands(app: Flask) -> None:
         authorize_admin_operation()
         email_clean = email.strip().lower()
         with app.app_context():
-            from models import User
-            user = User.query.filter_by(email=email_clean).first()
+            user = find_user_by_normalized_email(email_clean)
             if not user:
                 click.echo(f"Error: User with email '{email_clean}' not found in the database.")
                 return
+            user.email = email_clean
             user.is_admin = False
             user.role = 'user'
             db.session.commit()

@@ -213,8 +213,8 @@ Copy `.env.example` → `.env`:
 | `SECRET_KEY` | ✅ production | Private random string of at least 32 characters for sessions/CSRF. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"`; never commit it. |
 | `DATABASE_URL` | ✅ production | Defaults to SQLite for local development. Use the private PostgreSQL connection URL in production. |
 | `FLASK_ENV` | – | `development` (default) or `production`. |
-| `ADMIN_EMAILS` | For admin management | Comma-separated addresses authorized for trusted CLI admin bootstrapping. The example allowlists `kanugukaveri.31@gmail.com`; allowlisting alone never grants application privileges. |
-| `ADMIN_BOOTSTRAP_TOKEN` | For admin management | Private random secret of at least 32 characters, required interactively by administrator CLI commands. Keep it out of source control and rotate it after use. |
+| `ADMIN_EMAILS` | For admin management | Comma-separated addresses authorized for trusted CLI admin bootstrapping. The example allowlists `kanugukaveri.31@gmail.com`; allowlisting alone never grants application privileges. Keep restricted to the intended administrator. |
+| `ADMIN_BOOTSTRAP_TOKEN` | Temporary for admin provisioning | Private random secret of at least 32 characters, required by administrator CLI commands or the one-time web setup. Keep it out of source control and remove it from the deployment environment after provisioning. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | For payments | Test-mode keys from the Razorpay dashboard. Empty ⇒ checkout returns a friendly "not configured" message. |
 | `RAZORPAY_WEBHOOK_SECRET` | For webhooks | Webhook secret from the Razorpay dashboard. |
 | `MAIL_SERVER` / `MAIL_PORT` / `MAIL_USE_TLS` | – | SMTP settings (defaults: Gmail :587 TLS). |
@@ -228,8 +228,28 @@ Copy `.env.example` → `.env`:
 - **Dev:** SQLite is created automatically at first start (`db.create_all()` + idempotent performance indexes). Delete `resume_screening.db` to reset.
 - **Schema changes:** startup creates missing tables and safely adds the legacy `role` / `is_admin` columns and performance indexes without replacing existing user data. Other schema changes require a reviewed migration; `create_all()` does not alter existing tables.
 - **Production:** point `DATABASE_URL` at PostgreSQL; the app normalizes legacy `postgres://` URIs automatically.
-- **Initial Super Admin (no Render Shell required):** ensure the account has registered, then follow the PowerShell steps in [Provision the Super Admin from outside Render](#provision-the-super-admin-from-outside-render). The purpose-specific `bootstrap-super-admin` command requires the configured owner token and server-side email allowlist, can only promote `kanugukaveri.31@gmail.com`, changes no password or subscription, and writes the role to the existing PostgreSQL database. Run it from your computer against the database's TLS-protected external URL. Render provides separate internal and external URLs in the Postgres dashboard's **Connect** menu; the internal URL is only reachable by services on Render's private network. The command can be run again safely.
+- **Initial Super Admin:** ensure the account has registered, then follow [Provision the Super Admin through the web app](#provision-the-super-admin-through-the-web-app). This method requires an authenticated session for an account whose normalized email exactly matches an address in `ADMIN_EMAILS`, the bootstrap token, and the database-backed one-time claim. It changes no password or subscription. The existing CLI commands remain available to trusted operators.
 - **Existing account:** `flask --app app:create_app grant-admin admin@example.com` also requires the owner token, an allowlisted address, and a new password; it invalidates existing sessions. `flask --app app:create_app revoke-admin admin@example.com` requires the token as well. These commands are trusted-shell operations. Never expose role or admin fields through user-editable forms or APIs.
+
+### Provision the Super Admin through the web app
+
+This one-time alternative works when your Render plan does not include Shell access. Deploy the application version containing `/admin/provision` first. The Render Web Service must use `FLASK_ENV=production`, its existing persistent PostgreSQL `DATABASE_URL`, and a stable private `SECRET_KEY` of at least 32 characters. In the Render service's **Environment** settings, set `ADMIN_EMAILS` to exactly `kanugukaveri.31@gmail.com` and temporarily set `ADMIN_BOOTSTRAP_TOKEN` to a private random value of at least 32 characters.
+
+After the environment update has finished deploying, sign in to the already-registered account with its existing password. Open **Settings → Complete Admin Setup** (or visit `/admin/provision`), enter the bootstrap token in the password field, and submit. The endpoint requires login and a valid CSRF token, compares the submitted token securely, and only updates the existing account's admin role/flag. It preserves the FREE subscription and password. A persistent database claim makes provisioning one-time across app restarts and concurrent requests; allowlisted accounts cannot use the page again after the claim is made. The bootstrap token is not embedded in the page or returned in errors.
+
+After success, remove `ADMIN_BOOTSTRAP_TOKEN` from the Render environment and redeploy. Keep `ADMIN_EMAILS` restricted to the intended administrator. Sign in again if the application asks, and verify the dashboard shows ADMIN and all four premium features work without payment. Razorpay settings are not needed.
+
+### Provision the Super Admin in Render Shell
+
+This trusted-operator alternative runs the CLI against the same `DATABASE_URL` used by the Render service; it does not touch local SQLite. Deploy the application version containing `bootstrap-super-admin` first, and confirm the account has already registered.
+
+The Render Web Service must have `FLASK_ENV=production`, its existing persistent PostgreSQL `DATABASE_URL`, and a stable private `SECRET_KEY` of at least 32 characters. Temporarily set `ADMIN_EMAILS` to `kanugukaveri.31@gmail.com` and `ADMIN_BOOTSTRAP_TOKEN` to a private random value of at least 32 characters in the service's **Environment** settings. After the environment change has deployed, open that service's **Shell**, move to the project root if needed, and run:
+
+```sh
+python -m flask --app app:create_app bootstrap-super-admin
+```
+
+Enter the bootstrap token at the hidden prompt. The command promotes only the existing designated account, preserves its password and subscription, and safely canonicalizes a matching email with surrounding whitespace or different letter case. It refuses to proceed if multiple database records match that normalized email. No Razorpay configuration or payment is required. After success, remove `ADMIN_BOOTSTRAP_TOKEN` from the Render environment and redeploy; keep `ADMIN_EMAILS` restricted to the designated address if future CLI administration is needed. Sign in using the existing password.
 
 ### Provision the Super Admin from outside Render
 
