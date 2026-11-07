@@ -110,7 +110,7 @@ def upload():
 @login_required
 def analysis(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -270,7 +270,7 @@ def job_match_result(job_match_id):
 @require_plan('pro')
 def rejection_analysis(job_match_id):
     match_record = JobMatch.query.get_or_404(job_match_id)
-    if match_record.user_id != current_user.id and not _is_admin_user(current_user):
+    if match_record.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -303,7 +303,7 @@ def rejection_analysis(job_match_id):
 @require_plan('pro')
 def linkedin(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -335,7 +335,7 @@ def linkedin(resume_id):
 @require_plan('pro')
 def naukri(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -367,7 +367,7 @@ def naukri(resume_id):
 @require_plan('pro')
 def career(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -442,7 +442,7 @@ def resume_builder():
 @login_required
 def resume_editor(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -522,7 +522,7 @@ def reports_hub():
 def download_stored_report(report_id):
     """Re-download a previously generated report file."""
     record = GeneratedReport.query.get_or_404(report_id)
-    if record.user_id != current_user.id and not _is_admin_user(current_user):
+    if record.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('scanner.reports_hub'))
 
@@ -538,7 +538,7 @@ def download_stored_report(report_id):
 @require_plan('pro')
 def download_report(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id and not _is_admin_user(current_user):
+    if resume.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 
@@ -589,7 +589,7 @@ def download_report(resume_id):
 def download_rejection_report(job_match_id):
     """Dedicated AI Rejection Analyzer PDF report."""
     match_record = JobMatch.query.get_or_404(job_match_id)
-    if match_record.user_id != current_user.id and not _is_admin_user(current_user):
+    if match_record.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('main.dashboard'))
 

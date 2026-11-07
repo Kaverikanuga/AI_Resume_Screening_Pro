@@ -413,6 +413,43 @@ def test_free_admin_can_access_authorized_features(
     assert b'Requires PRO' not in response.data
 
 
+@pytest.mark.parametrize(
+    'route_template',
+    [
+        '/resume-builder',
+        '/linkedin/{resume_id}',
+        '/naukri/{resume_id}',
+        '/career/{resume_id}',
+    ],
+    ids=['resume-builder', 'linkedin', 'naukri', 'career'],
+)
+def test_ajax_feature_access_respects_admin_and_free_plans(
+    app, authenticated_free_user, route_template
+):
+    client, user_id, resume_id, _ = authenticated_free_user
+    route = route_template.format(resume_id=resume_id)
+    headers = {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    }
+
+    free_response = client.get(route, headers=headers)
+    assert free_response.status_code == 403
+    assert free_response.get_json()['error'] == 'premium_required'
+
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.is_admin = True
+        user.role = 'user'
+        db.session.commit()
+
+    authenticate_client(client, app, user_id)
+    admin_response = client.get(route, headers=headers)
+    assert admin_response.status_code == 200
+    assert b'Premium Feature' not in admin_response.data
+    assert b'Requires PRO' not in admin_response.data
+
+
 def test_free_admin_can_generate_owned_pdf_reports(app, authenticated_free_user):
     client, user_id, resume_id, match_id = authenticated_free_user
     with app.app_context():
@@ -1122,6 +1159,7 @@ def test_admin_ui_shows_access_without_payment_and_free_user_checkout_remains(ap
 
     settings = client.get('/settings')
     assert b'ADMIN' in settings.data
+    assert b'Subscription: FREE' in settings.data
     assert b'Admin access does not require payment' in settings.data
     assert b'Upgrade Subscription' not in settings.data
 

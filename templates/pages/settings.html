@@ -15,6 +15,7 @@
             <span class="text-muted small">Current Active Plan:</span>
             {% if current_user.check_is_admin() %}
             <span class="badge bg-warning text-dark text-uppercase fs-6">ADMIN</span>
+            <span class="text-muted small ms-2">Subscription: {{ (subscription.plan if subscription else 'FREE')|upper }}</span>
             {% else %}
             <span class="badge bg-primary text-uppercase fs-6">{{ subscription.plan if subscription else 'FREE'
               }}</span>
