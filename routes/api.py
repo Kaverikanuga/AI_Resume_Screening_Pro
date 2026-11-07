@@ -5,6 +5,7 @@ Auxiliary JSON API endpoints for AJAX interactions.
 from flask import Blueprint, jsonify
 from flask_login import login_required, current_user
 from models import Resume, JobMatch
+from utils import _is_admin_user
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -13,7 +14,7 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 @login_required
 def get_ats_score(resume_id):
     resume = Resume.query.get_or_404(resume_id)
-    if resume.user_id != current_user.id:
+    if resume.user_id != current_user.id and not _is_admin_user(current_user):
         return jsonify({'error': 'Unauthorized'}), 403
 
     return jsonify({

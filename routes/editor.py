@@ -146,7 +146,8 @@ def default_doc() -> dict:
 
 def get_owned_doc_or_404(doc_id: int) -> ResumeDoc:
     doc = ResumeDoc.query.get_or_404(doc_id)
-    if doc.user_id != current_user.id or not doc.is_active:
+    from utils import _is_admin_user
+    if (doc.user_id != current_user.id and not _is_admin_user(current_user)) or not doc.is_active:
         abort_owner()
     return doc
 
